@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#09152d"><meta name="description" content="化身光之小英雄，用身体动作释放光线与光轮，守护城市。">
+  <title>光之小英雄 · 奥特曼体感大冒险</title>
+  <link rel="icon" href="./public/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar"><a class="brand" href="./" aria-label="光之小英雄首页"><span class="brand-icon">✦</span><span>光之小英雄<small>ULTRA LITTLE HEROES</small></span></a><div class="top-actions"><span class="local-note"><i></i> 影像仅在本机处理</span><button id="sound" class="icon-button" aria-label="开启声音" aria-pressed="false">♪</button><button id="help" class="quiet-button">玩法指南</button></div></header>
+    <main>
+      <div class="mission-line"><span class="eyebrow">地球防卫任务 <b id="mission-number">01</b></span><span id="mission-text">日落海湾 · 守护城市</span><span class="live-label"><i></i><span id="input-label">按键 / 点击操作</span></span></div>
+      <section class="arena" aria-label="怪兽对战场景">
+        <canvas id="game" aria-label="英雄与怪兽的战斗画面"></canvas>
+        <div class="battle-hud"><div class="hero-hud"><span class="avatar">✦</span><div><span class="hud-name">光之小英雄 <small>守护能量</small></span><div class="health-track"><span id="hero-health"></span></div></div></div><div class="wave-badge"><span>第 <b id="wave">1</b> 波</span><small id="score">守护星星 0</small></div><div class="monster-hud"><span class="hud-name"><small id="monster-type">海湾入侵者</small><span id="monster-name">岩甲怪兽</span></span><div class="health-track monster-track"><span id="monster-health"></span></div></div></div>
+        <div id="callout" class="callout" aria-live="polite"></div>
+        <div id="tracking-tip" class="tracking-tip" hidden>让肩膀、手肘和双手都出现在画面里</div>
+        <button id="pause" class="arena-pause" aria-label="暂停游戏" hidden>Ⅱ</button>
+        <div id="welcome" class="welcome-layer"><span class="little-tag">你的勇气，就是光</span><h1>小英雄，<br>该你上场了<span>！</span></h1><p>举起双手，凝聚光的力量。<br>和奥特曼一起守护日落海湾。</p><div class="welcome-buttons"><button id="start-camera" class="primary-button">开启摄像头出战 <span>↗</span></button><button id="start-keyboard" class="secondary-button">先用按键试玩 <span>→</span></button></div><span class="welcome-foot">单人游玩 · 无需登录 · 适合大朋友陪小朋友一起玩</span></div>
+        <div id="pause-panel" class="center-panel" hidden><span class="little-tag">补充一点光的力量</span><h2>小英雄休息中</h2><p>准备好了，就继续守护城市。</p><button id="resume" class="primary-button">继续冒险 →</button><button id="restart" class="quiet-button">重新开始</button></div>
+        <div class="scene-caption"><span>◈ SUNSET BAY</span><span id="scene-status">城市正在等待它的小英雄</span></div>
+      </section>
+      <section class="control-deck" aria-label="招式和输入设置">
+        <div class="skills"><div class="section-label"><span>你的光之力量</span><small>动作保持一下，让能量聚起来</small></div><div class="skill-grid">
+          <button class="skill-card beam" id="beam-button"><span class="skill-symbol">╋</span><span class="skill-copy"><strong>梅特里姆光线</strong><small>双臂在胸前摆成十字</small><span class="skill-meta">强力光线 <b>J</b></span></span><span class="cooldown" id="beam-cooldown"></span></button>
+          <button class="skill-card disc" id="disc-button"><span class="skill-symbol">◎</span><span class="skill-copy"><strong>八分光轮</strong><small>举手蓄力，再向外挥出</small><span class="skill-meta">旋转光轮 <b>K</b></span></span><span class="cooldown" id="disc-cooldown"></span></button>
+        </div><div class="energy-line"><span id="gesture-status">点击招式卡，或按 J / K 释放绝招</span><div class="charge-track"><span id="charge"></span></div></div></div>
+        <aside class="camera-card"><div class="section-label"><span>英雄视窗</span><button id="settings" class="text-button">设置 ↗</button></div><div class="camera-preview" id="preview"><video id="input-video" muted playsinline></video><canvas id="skeleton"></canvas><div id="camera-empty"><span>⌁</span><small>让光看见你的动作</small></div><span id="camera-state" class="camera-state">摄像头未开启</span></div><div class="camera-controls"><button id="camera-toggle" class="text-button">开启摄像头</button><label class="text-button file-label">导入动作视频<input id="video-file" type="file" accept="video/*"></label></div></aside>
+      </section>
+      <footer><span>每一个勇敢的小朋友，心中都有一道光。</span><span>留出挥臂空间 · 不用奔跑或跳跃</span></footer>
+    </main>
+  </div>
+  <dialog id="help-dialog"><button class="dialog-close" data-close aria-label="关闭">×</button><span class="eyebrow">HERO HANDBOOK</span><h2>把光的力量，交给你</h2><div class="guide-grid"><div><div class="pose-illustration cross"><i></i><b></b><em></em></div><h3>梅特里姆光线</h3><p>在胸前把一条前臂横过来，另一条前臂竖起来，形成十字。保持约半秒，发射！左右手都可以。</p></div><div><div class="pose-illustration raise"><i></i><b></b><em></em></div><h3>八分光轮</h3><p>一只手举到肩膀上方，稍停一下蓄力，然后向身体外侧挥出。慢一点也可以。</p></div></div><p class="dialog-note">先让头部、肩膀、手肘和双手完整入镜。面对摄像头，光线充足；大朋友可以先示范一次。按 J / K 或点招式卡也能玩。</p><button class="primary-button" data-close>我准备好啦 →</button></dialog>
+  <dialog id="settings-dialog"><button class="dialog-close" data-close aria-label="关闭">×</button><span class="eyebrow">HERO STATION</span><h2>英雄控制台</h2><label class="setting-row">动作宽容度<select id="sensitivity"><option value="easy">轻松 · 推荐小朋友</option><option value="normal">标准</option></select></label><label class="setting-row">显示骨骼线<input type="checkbox" id="show-skeleton" checked></label><label class="setting-row">安心练习 <small>怪兽不消耗守护能量</small><input type="checkbox" id="practice"></label><label class="setting-row">识别诊断<input type="checkbox" id="show-debug"></label><pre id="debug" hidden>等待动作输入</pre><div id="replay-controls" hidden><label class="setting-row">视频播放速度<select id="replay-speed"><option value="0.5">0.5 倍</option><option value="1" selected>1 倍</option><option value="1.5">1.5 倍</option></select></label><button id="replay-toggle" class="quiet-button">暂停 / 播放视频</button></div><p class="dialog-note">视频与识别在本机处理，不上传、不保存。初次开启需要加载姿态模型。摄像头失败时仍可用按键或视频游玩。</p><button id="stop-input" class="secondary-button">关闭影像，使用按键</button></dialog>
+  <script type="module" src="./src/main.js"></script>
+</body></html>
