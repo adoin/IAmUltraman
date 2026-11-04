@@ -51,3 +51,7 @@ npm run dev
 ## 第三方
 
 Three.js 0.180.0：MIT。MediaPipe Tasks Vision 0.10.32：Apache-2.0。Pose Landmarker Lite 模型来自 Google 官方模型分发。详见 `THIRD_PARTY_NOTICES.md`。本项目为非官方同人体感游戏，怪兽与护臂为原创简化模型，未使用官方影视、音乐或贴图。
+
+## 技能光效检查
+
+`npm run test:effects` 在浏览器里冻结模拟并逐帧推进，读取真实 WebGL 像素验证蓝白光束、发光光轮、护盾展开和命中爆光；包含手机竖屏、冷却拒绝时不重复生成特效、动画资源清理和光轮命中时序。使用与 test:browser 相同的 GAME_URL / BROWSER_ARTIFACT_DIR 环境变量，截图放在独立任务临时目录。光效是 3D 场景内容，不依赖 HUD 或 DOM 覆盖层。

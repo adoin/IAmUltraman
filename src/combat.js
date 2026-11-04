@@ -5,7 +5,7 @@ export const WAVES = [
   {name:'潮汐兽 · 风暴',model:'leviathan',title:'风暴核心',hp:200,color:0x62cfff,attacks:['sweep','bolt','charge']},
   {name:'星焰龙 · 诺瓦',model:'nova',title:'最终守护战',hp:290,color:0xff8960,attacks:['bolt','sweep','slam','charge']},
 ];
-export const SKILLS={beam:{cooldown:3.2,damage:46,impact:.4,duration:1.1},disc:{cooldown:1.65,damage:31,impact:.65,duration:1.15}};
+export const SKILLS={beam:{cooldown:3.2,damage:46,impact:.4,duration:1.45},disc:{cooldown:1.65,damage:31,impact:.65,duration:1.15}};
 export const PUNCH={cooldown:.38,damage:12,impact:.18,duration:.36};
 export const ATTACKS={
   bolt:{name:'能量弹',hint:'向左右侧身躲开，或举起双臂防御',damage:14,windup:2.2,flight:1.15},
@@ -24,7 +24,7 @@ export class BattleEngine {
   setDefense(guard,lean=0){this.guard=!!guard;this.lean=clamp(lean,-1,1);}
   punch(side='right'){if(!this.playing||this.paused||this.defeated||this.finished||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.guard=false;this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
   cast(skill){const config=SKILLS[skill];if(!config||!this.playing||this.paused||this.defeated||this.finished||this.time-this.lastCast[skill]<config.cooldown)return false;this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,age:0,duration:config.duration,hit:false});this.onEvent({type:'cast',skill});return true;}
-  damage(amount){if(this.defeated||this.finished)return;this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount});
+  damage(amount,source='hit'){if(this.defeated||this.finished)return;this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount,source});
     if(this.attack&&this.attack.phase==='windup'&&amount>=40){this.attack=null;this.nextAttack=2.5;this.onEvent({type:'interrupt'});}
     if(this.monsterHealth===0){this.defeated=true;this.attack=null;this.stars+=3+this.wave;this.respawn=3;this.heroHealth=Math.min(100,this.heroHealth+15);this.guardEnergy=Math.min(100,this.guardEnergy+30);this.onEvent({type:'defeat',wave:this.wave});}this.emit();}
   beginAttack(kind){if(this.defeated||this.finished||this.attack)return;const config=ATTACKS[kind];const fast=this.difficulty==='normal'?.8:1;this.attack={kind,phase:'windup',age:0,windup:config.windup*fast,flight:config.flight,originLean:this.lean,safeSide:this.attackIndex%2?-1:1};this.onEvent({type:'telegraph',attack:{...this.attack},config});}
@@ -40,7 +40,7 @@ export class BattleEngine {
     if(this.heroHealth===0){this.finished=true;this.onEvent({type:'over',stars:this.stars,stats:{...this.stats}});}
   }
   update(dt){if(!this.playing||this.paused||this.finished||dt<=0)return;this.time+=dt;const wasEnergy=this.guardEnergy;this.guardEnergy=clamp(this.guardEnergy+(this.guard?-10:14)*dt,0,100);if(Math.floor(wasEnergy/2)!==Math.floor(this.guardEnergy/2))this.emit();
-    for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=config.impact){effect.hit=true;this.damage(config.damage);}}
+    for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=config.impact){effect.hit=true;this.damage(config.damage,effect.kind);}}
     this.effects=this.effects.filter(e=>e.age<e.duration);
     if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=5;this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
     if(this.attack){this.attack.age+=dt;if(this.attack.phase==='windup'&&this.attack.age>=this.attack.windup){this.attack.phase='flight';this.attack.age=0;this.onEvent({type:'enemy-cast',attack:{...this.attack}});}else if(this.attack.phase==='flight'&&this.attack.age>=this.attack.flight)this.resolveAttack();}
