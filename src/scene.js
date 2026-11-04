@@ -12,7 +12,7 @@ export class BattleScene extends BattleEngine {
     this.renderScene=new THREE.Scene();this.renderScene.background=new THREE.Color(0x345572);this.renderScene.fog=new THREE.FogExp2(0x526b80,.008);
     this.camera=new THREE.PerspectiveCamera(57,1,.08,700);this.camera.position.set(0,9,20);this.camera.lookAt(0,6,-25);this.renderScene.add(this.camera);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.65));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.1;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.65));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.models=new Map();this.currentMonster=null;this.visualEffects=[];this.hitFlash=0;this.hurt=0;this.defenseFlash=0;this.renderLean=0;this.guardAmount=0;this.modelError=null;this.assetReady=false;this.lastNow=performance.now();this.frameCount=0;
     this.makeWorld();this.makeForeground();this.ready=this.loadAssets().catch(error=>{this.modelError=String(error);this.clientEvent({type:'load-error',error:this.modelError});throw error;});this.ready.catch(()=>{});
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas);this.resize();
@@ -21,9 +21,9 @@ export class BattleScene extends BattleEngine {
   }
   mesh(geometry,material,position,parent=this.renderScene){const o=new THREE.Mesh(geometry,material);if(position)o.position.copy(position);parent.add(o);return o;}
   makeWorld(){
-    const world=this.renderScene;world.add(new THREE.HemisphereLight(0xb5d9ff,0x493c50,1.3));
-    const sun=new THREE.DirectionalLight(0xffd2a3,2.5);sun.position.set(-35,55,35);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-55,right:55,top:55,bottom:-55,near:1,far:160});sun.shadow.bias=-.0006;world.add(sun);world.add(sun.target);
-    const rim=new THREE.DirectionalLight(0x70d4ff,1.4);rim.position.set(30,25,-40);world.add(rim);
+    const world=this.renderScene;world.add(new THREE.HemisphereLight(0xd5e2ee,0x40363b,1.5));
+    const sun=new THREE.DirectionalLight(0xffe0bd,2.0);sun.position.set(-35,55,35);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-55,right:55,top:55,bottom:-55,near:1,far:160});sun.shadow.bias=-.0006;world.add(sun);world.add(sun.target);
+    const rim=new THREE.DirectionalLight(0xb0cddd,1.0);rim.position.set(30,25,-40);world.add(rim);
     const concrete=new THREE.MeshStandardMaterial({color:0x3b4a58,roughness:.95});
     const ground=this.mesh(new THREE.PlaneGeometry(700,700),concrete,V(0,-.15,-70));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;
     const plaza=this.mesh(new THREE.PlaneGeometry(24,160),new THREE.MeshStandardMaterial({color:0x293849,roughness:.9}),V(0,-.1,-32));plaza.rotation.x=-Math.PI/2;plaza.receiveShadow=true;
@@ -43,7 +43,8 @@ export class BattleScene extends BattleEngine {
     this.targetRing=this.mesh(new THREE.RingGeometry(6.9,7.05,72),glow(0x77d3ed,.45),V(0,.05,-15));this.targetRing.rotation.x=-Math.PI/2;this.targetRing.visible=false;
     this.warningRing=this.mesh(new THREE.RingGeometry(7.3,7.65,72),glow(0xffa266,.5),V(0,.07,-15));this.warningRing.rotation.x=-Math.PI/2;this.warningRing.visible=false;
     this.safeZone=this.mesh(new THREE.PlaneGeometry(7,20),glow(0x58edc7,.12),V(5,.1,2));this.safeZone.rotation.x=-Math.PI/2;this.safeZone.visible=false;
-    this.monsterLight=new THREE.PointLight(0x4fffd9,80,28,1.7);this.monsterLight.position.set(0,9,-12);world.add(this.monsterLight);
+    const creatureFill=new THREE.PointLight(0xfff2e6,180,24,2);creatureFill.position.set(0,13,-7);world.add(creatureFill);
+    this.monsterLight=new THREE.PointLight(0x4fffd9,0,20,1.7);this.monsterLight.position.set(0,9,-12);world.add(this.monsterLight);
   }
   makeForeground(){
     this.hands=new THREE.Group();this.camera.add(this.hands);this.handMeshes=[];
@@ -52,7 +53,7 @@ export class BattleScene extends BattleEngine {
     const reticle=new THREE.Group();this.camera.add(reticle);reticle.visible=false;const m=glow(0x9ef9ef,.65);for(const axis of [0,1])this.mesh(new THREE.PlaneGeometry(axis?.003:.03,axis?.03:.003),m,V(0,0,-2),reticle);reticle.position.y=-.06;
     this.impactVeil=this.mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({color:0xff785b,transparent:true,opacity:0,depthTest:false,depthWrite:false}),V(0,0,-.2),this.camera);this.impactVeil.renderOrder=100;
   }
-  async loadAssets(){const loader=new GLTFLoader();await Promise.all(['basalt','leviathan','nova','hero-hands'].map(async name=>{const gltf=await loader.loadAsync(new URL(`../public/models/kaiju/${name}.glb`,import.meta.url).href);const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=name!=='hero-hands';o.receiveShadow=true;if(o.material)o.material.side=THREE.DoubleSide;}});this.models.set(name,model);}));
+  async loadAssets(){const loader=new GLTFLoader();const revision=new URL(import.meta.url).searchParams.get('v')||'local';await Promise.all(['basalt','leviathan','nova','hero-hands'].map(async name=>{const gltf=await loader.loadAsync(new URL(`../public/models/kaiju/${name}.glb?v=${revision}`,import.meta.url).href);const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=name!=='hero-hands';o.receiveShadow=true;if(o.material)o.material.side=THREE.DoubleSide;}});this.models.set(name,model);}));
     const handRoot=this.models.get('hero-hands');this.hands.add(handRoot);for(const tag of ['L','R']){const arm=handRoot.getObjectByName('HeroArm'+tag);this.handMeshes.push(arm);}this.assetReady=true;this.selectMonster();this.clientEvent({type:'assets-ready'});
   }
   selectMonster(){if(!this.assetReady)return;if(this.currentMonster)this.renderScene.remove(this.currentMonster);this.currentMonster=this.models.get(this.waveInfo.model);this.currentMonster.position.set(0,0,-15);this.currentMonster.scale.setScalar(this.wave===5?1.8:1.5);this.renderScene.add(this.currentMonster);this.currentMonster.visible=true;this.pivots={};for(const name of ['Body','Head','Jaw','ArmL','ArmR','ForearmL','ForearmR','Tail','WingL','WingR']){const pivot=this.currentMonster.getObjectByName(name);if(pivot){pivot.rotation.set(0,0,0);this.pivots[name]=pivot;}}
@@ -114,9 +115,9 @@ export class BattleScene extends BattleEngine {
   setQuality(quality){this.renderer.setPixelRatio(quality==='low'?1:Math.min(devicePixelRatio||1,1.65));this.renderer.shadowMap.enabled=quality!=='low';this.resize();}
   animateMonster(dt){const m=this.currentMonster;if(!m)return;const t=this.time,p=this.pivots,a=this.attack,idle=this.reduced?0:Math.sin(t*1.6)*.08,winding=a?.phase==='windup'?clamp(a.age/a.windup,0,1):0,attack=a?.phase==='flight';
     m.rotation.y=this.defeated?.18*Math.sin(t):Math.sin(t*.5)*.04;m.position.y=this.defeated?-Math.pow(1-clamp(this.respawn/3,0,1),2)*21:0;m.position.z=mix(m.position.z,-15+(attack&&a.kind==='charge'?Math.sin(a.age/a.flight*Math.PI/2)*24:0),1-Math.exp(-dt*8));m.position.x=attack&&a.kind==='sweep'?Math.sin(a.age/a.flight*Math.PI)*-a.safeSide*3:0;
-    if(p.Body){p.Body.rotation.x=idle+(a?.kind==='slam'?winding*.22:0);p.Body.position.y=4.9+(this.reduced?0:Math.sin(t*1.6)*.07);}if(p.Head){p.Head.rotation.x=-winding*.22;p.Head.rotation.y=Math.sin(t*.7)*.07;}if(p.Jaw)p.Jaw.rotation.x=winding*.45+(attack?.25:0);
-    if(p.ArmL){p.ArmL.rotation.x=a?.kind==='slam'?-winding*2.3:idle-.1-winding*.6;p.ArmL.rotation.z=-.12-(a?.kind==='sweep'&&a.safeSide>0?winding*.8:0);}if(p.ArmR){p.ArmR.rotation.x=a?.kind==='slam'?-winding*2.3:-idle-.1-winding*.6;p.ArmR.rotation.z=.12+(a?.kind==='sweep'?winding*.8:0);}if(p.Tail)p.Tail.rotation.y=Math.sin(t*1.3)*.16;if(p.WingL)p.WingL.rotation.y=Math.sin(t*1.4)*.16;if(p.WingR)p.WingR.rotation.y=-Math.sin(t*1.4)*.16;
-    this.warningRing.visible=false;this.warningRing.material.opacity=.35+Math.sin(t*10)*.2;this.warningRing.scale.setScalar(1+winding*.15);this.safeZone.visible=false;if(a)this.safeZone.position.x=a.safeSide*6;this.monsterLight.intensity=60+winding*100+this.hitFlash*180;
+    if(p.Body){p.Body.rotation.x=(this.waveInfo.model==='leviathan'?.14:.06)+idle+(a?.kind==='slam'?winding*.22:0);p.Body.position.y=4.9+(this.reduced?0:Math.sin(t*1.6)*.07);}if(p.Head){p.Head.rotation.x=-winding*.22;p.Head.rotation.y=Math.sin(t*.7)*.07;}if(p.Jaw)p.Jaw.rotation.x=winding*.45+(attack?.25:0);
+    if(p.ArmL){p.ArmL.rotation.x=a?.kind==='slam'?-winding*2.3:idle-.1-winding*.6;p.ArmL.rotation.z=-.12-(a?.kind==='sweep'&&a.safeSide>0?winding*.8:0);}if(p.ArmR){p.ArmR.rotation.x=a?.kind==='slam'?-winding*2.3:-idle-.1-winding*.6;p.ArmR.rotation.z=.12+(a?.kind==='sweep'?winding*.8:0);}if(p.ForearmL)p.ForearmL.rotation.x=-.32+idle+winding*.12;if(p.ForearmR)p.ForearmR.rotation.x=-.42-idle+winding*.12;if(p.Tail)p.Tail.rotation.y=Math.sin(t*1.3)*.16;if(p.WingL)p.WingL.rotation.y=Math.sin(t*1.4)*.16;if(p.WingR)p.WingR.rotation.y=-Math.sin(t*1.4)*.16;
+    this.warningRing.visible=false;this.warningRing.material.opacity=.35+Math.sin(t*10)*.2;this.warningRing.scale.setScalar(1+winding*.15);this.safeZone.visible=false;if(a)this.safeZone.position.x=a.safeSide*6;this.monsterLight.intensity=winding*12+this.hitFlash*20;
   }
   animateHands(dt){const factor=1-Math.exp(-dt*10);this.renderLean=mix(this.renderLean,this.lean,factor);const guard=this.guard&&this.guardEnergy>0?1:0;if(guard&&!this.guardWasActive)this.shieldIgnition=.55;this.guardWasActive=guard;this.shieldIgnition=Math.max(0,(this.shieldIgnition||0)-dt);this.guardAmount=mix(this.guardAmount,guard,factor);const latest=this.effects.find(e=>e.kind==='beam'),disc=this.effects.find(e=>e.kind==='disc'),punch=this.effects.find(e=>e.kind==='punch');this.hands.visible=!!(latest||disc||punch||this.guardAmount>.02);
     this.camera.position.x=this.renderLean*4.5;this.camera.position.y=9+(this.reduced?0:Math.sin(this.time*1.4)*.025);this.camera.rotation.z=this.reduced?0:-this.renderLean*.035;this.camera.rotation.y=-this.renderLean*.025;
