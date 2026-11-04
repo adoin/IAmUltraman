@@ -12,7 +12,7 @@ export class GestureRecognizer {
   reset(){this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;}
   update(points,time,width=640,height=480){
     const out={skill:null,charge:0,guard:false,lean:0,status:'双臂摆十字发光线；举手后向外挥出光轮',tracking:false,debug:{}};
-    if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>350)) this.reset();
+    if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>900)) this.reset();
     this.lastTime=time;
     if(!points) return this.lost(out);
     const p=points.map(v=>({...v,x:v.x*width,y:v.y*height}));
