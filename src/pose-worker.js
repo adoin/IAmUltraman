@@ -14,9 +14,10 @@ self.onmessage=async({data})=>{
       const canvas=new OffscreenCanvas(256,256);canvas.getContext('2d').fillRect(0,0,256,256);
       const bitmap=await createImageBitmap(canvas);
       try{
-        const start=performance.now();model.detectForVideo(bitmap,0);
-        if(delegate==='GPU'&&performance.now()-start>300){await model.setOptions({baseOptions:{delegate:'CPU'}});delegate='CPU';}
-        model.detectForVideo(bitmap,1);
+        model.detectForVideo(bitmap,0);
+        // Measure after shader compilation, rather than treating cold startup as steady-state speed.
+        const start=performance.now();model.detectForVideo(bitmap,1);
+        if(delegate==='GPU'&&performance.now()-start>300){await model.setOptions({baseOptions:{delegate:'CPU'}});delegate='CPU';model.detectForVideo(bitmap,2);}
       }finally{bitmap.close();}
       self.postMessage({type:'ready',delegate});
     }catch(error){self.postMessage({type:'error',message:'姿态模型加载失败，请刷新重试，或先用按键游玩。',detail:String(error)});}
