@@ -8,7 +8,7 @@ const browser=await chromium.launch({...(process.env.CHROME_EXECUTABLE?{executab
 try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
   page.on('pageerror',e=>errors.push(String(e)));
-  page.on('console',e=>{if(e.type()==='error'&&!e.text().includes('favicon'))errors.push(e.text());});
+  page.on('console',e=>{if(e.type()==='error'&&!e.text().includes('favicon')&&e.text()!=='INFO: Created TensorFlow Lite XNNPACK delegate for CPU.')errors.push(e.text());});
   await page.goto(process.env.GAME_URL||'http://127.0.0.1:4173',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.getElementById('load-status').textContent==='海湾准备就绪');
   const act=fn=>page.evaluate(async text=>{const{battle}=await import(document.querySelector('script[type=module]').src);return new Function('b',text)(battle);},fn);
