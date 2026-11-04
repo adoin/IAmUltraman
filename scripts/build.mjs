@@ -1,8 +1,22 @@
-import { mkdir, cp, rm, stat } from 'node:fs/promises';
+import { mkdir, cp, rm, stat, readFile, writeFile, readdir } from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+await mkdir('public/vendor/three/addons/loaders',{recursive:true});
+await mkdir('public/vendor/three/addons/utils',{recursive:true});
+for(const file of ['three.module.js','three.core.js'])await cp(`node_modules/three/build/${file}`,`public/vendor/three/${file}`);
+await cp('node_modules/three/examples/jsm/loaders/GLTFLoader.js','public/vendor/three/addons/loaders/GLTFLoader.js');
+await cp('node_modules/three/examples/jsm/utils/BufferGeometryUtils.js','public/vendor/three/addons/utils/BufferGeometryUtils.js');
+await cp('node_modules/three/LICENSE','public/vendor/three/LICENSE');
 await stat('public/models/pose_landmarker_lite.task');
 await rm('dist',{recursive:true,force:true});
 await mkdir('dist',{recursive:true});
 for (const file of ['index.html','style.css','src']) await cp(file,`dist/${file}`,{recursive:true});
 await cp('public','dist/public',{recursive:true});
 await cp('public/.nojekyll','dist/.nojekyll');
+// Version every application module together so a previous visit cannot mix 2D and 3D code.
+const scripts=(await readdir('src')).filter(name=>name.endsWith('.js'));
+const sources=await Promise.all(scripts.map(name=>readFile(`src/${name}`,'utf8')));
+const entry=await readFile('index.html','utf8'),css=await readFile('style.css','utf8');
+const version=createHash('sha256').update(entry+css+sources.join('\n')).digest('hex').slice(0,12);
+for(let i=0;i<scripts.length;i++)await writeFile(`dist/src/${scripts[i]}`,sources[i].replace(/(['"])(\.{1,2}\/[^'"\s]+\.js)\1/g,(_,quote,url)=>`${quote}${url}?v=${version}${quote}`));
+await writeFile('dist/index.html',entry.replace('./style.css','./style.css?v='+version).replace('./src/main.js','./src/main.js?v='+version));
 console.log('Static site built in dist/');

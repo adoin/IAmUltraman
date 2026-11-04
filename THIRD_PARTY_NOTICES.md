@@ -1,5 +1,13 @@
 # Third-party notices
 
+## Three.js
+
+Three.js 0.180.0, copyright 2010-2025 three.js authors. MIT license, full text in public/vendor/three/LICENSE. Runtime modules and GLTFLoader are copied from the pinned npm package by scripts/build.mjs.
+
+## Original game models
+
+The basalt, leviathan, nova and hero-hands models were authored for this project using art/create_models.py in Blender. They do not use downloaded character meshes, textures or animations. Editable masters are in art/models; runtime GLBs in public/models/kaiju. Runtime movement animates their named node pivots. These are original simplified creatures and gauntlets, not official Ultraman character assets.
+
 ## MediaPipe Tasks Vision
 
 Copyright Google LLC. Licensed under Apache License 2.0.

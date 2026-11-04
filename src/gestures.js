@@ -9,9 +9,9 @@ function segmentDistance(p,a,b) {
 /** Geometry uses image pixels (not normalized x/y) to preserve angles at any aspect ratio. */
 export class GestureRecognizer {
   constructor(){this.mode='easy';this.reset();}
-  reset(){this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;}
+  reset(){this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;}
   update(points,time,width=640,height=480){
-    const out={skill:null,charge:0,status:'双臂摆十字发光线；举手后向外挥出光轮',tracking:false,debug:{}};
+    const out={skill:null,charge:0,guard:false,lean:0,status:'双臂摆十字发光线；举手后向外挥出光轮',tracking:false,debug:{}};
     if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>350)) this.reset();
     this.lastTime=time;
     if(!points) return this.lost(out);
@@ -21,6 +21,8 @@ export class GestureRecognizer {
     const scale=Math.max(length(ls,rs),height*.07);
     if(length(ls,rs)<width*.055)return this.lost(out);
     out.tracking=true;
+    this.center??=(ls.x+rs.x)/2;
+    out.lean=clamp(-((ls.x+rs.x)/2-this.center)/scale*1.8,-1,1);
     const forearms=[[le,lw],[re,rw]];
     const angles=forearms.map(([a,b])=>Math.atan2(Math.abs(b.y-a.y),Math.abs(b.x-a.x))*180/Math.PI);
     const horizontal=Math.min(...angles),vertical=Math.max(...angles);
@@ -29,6 +31,9 @@ export class GestureRecognizer {
     const centerY=(ls.y+rs.y)/2;
     const chest=(lw.y+rw.y)/2 > centerY-scale*.75 && (lw.y+rw.y)/2 < centerY+scale*1.65;
     const cross=horizontal<(easy?43:30) && vertical>(easy?47:60) && gap<(easy?.65:.4) && chest;
+    const guardPose=!cross&&lw.y<ls.y+scale*.35&&rw.y<rs.y+scale*.35&&length(lw,rw)>scale*.8&&angles.every(a=>a>45);
+    if(guardPose){this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'光之护盾展开！保持举臂':'举起双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
+    this.guardSince=null;
     const hold=easy?420:600;
     out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,armed:this.armed.some(Boolean)};
     if(cross){
@@ -57,5 +62,5 @@ export class GestureRecognizer {
     }
     return out;
   }
-  lost(out){this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
+  lost(out){this.crossSince=null;this.crossFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
 }
