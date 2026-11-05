@@ -1,3 +1,4 @@
+import {BEAM_TIMING,DISC_TIMING} from './action-timing.js';
 export const WAVES = [
   {name:'岩甲兽 · 格兰',model:'basalt',title:'海湾入侵者',hp:110,color:0x62edc6,attacks:['bolt','slam']},
   {name:'潮汐兽 · 澜牙',model:'leviathan',title:'深海来客',hp:145,color:0x68d9ff,attacks:['bolt','sweep']},
@@ -5,7 +6,7 @@ export const WAVES = [
   {name:'潮汐兽 · 风暴',model:'leviathan',title:'风暴核心',hp:200,color:0x62cfff,attacks:['sweep','bolt','charge']},
   {name:'星焰龙 · 诺瓦',model:'nova',title:'最终守护战',hp:290,color:0xff8960,attacks:['bolt','sweep','slam','charge']},
 ];
-export const SKILLS={beam:{cooldown:3.2,damage:46,impact:.4,duration:1.45},disc:{cooldown:1.65,damage:31,impact:.65,duration:1.15}};
+export const SKILLS={beam:{cooldown:3.2,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},disc:{cooldown:1.65,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
 export const PUNCH={cooldown:.38,damage:12,impact:.18,duration:.36};
 export const ATTACKS={
   bolt:{name:'能量弹',hint:'向左右侧身躲开，或举起双臂防御',damage:14,windup:2.2,flight:1.15},
@@ -21,9 +22,9 @@ export class BattleEngine {
   get waveInfo(){return WAVES[this.wave-1];}
   start(){this.reset();this.playing=true;this.onEvent({type:'wave',wave:1,info:this.waveInfo});}
   emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}
-  setDefense(guard,lean=0){this.guard=!!guard;this.lean=clamp(lean,-1,1);}
-  punch(side='right'){if(!this.playing||this.paused||this.defeated||this.finished||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.guard=false;this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
-  cast(skill){const config=SKILLS[skill];if(!config||!this.playing||this.paused||this.defeated||this.finished||this.time-this.lastCast[skill]<config.cooldown)return false;this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,age:0,duration:config.duration,hit:false});this.onEvent({type:'cast',skill});return true;}
+  setDefense(guard,lean=0){this.guard=!!guard&&!this.effects.some(e=>SKILLS[e.kind]);this.lean=clamp(lean,-1,1);}
+  punch(side='right'){if(!this.playing||this.paused||this.defeated||this.finished||this.effects.some(e=>SKILLS[e.kind])||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.guard=false;this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
+  cast(skill){const config=SKILLS[skill];if(!config||!this.playing||this.paused||this.defeated||this.finished||this.effects.some(e=>SKILLS[e.kind]||(e.kind==='punch'&&e.age<PUNCH.impact))||this.time-this.lastCast[skill]<config.cooldown)return false;this.guard=false;this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,age:0,duration:config.duration,hit:false});this.onEvent({type:'cast',skill});return true;}
   damage(amount,source='hit'){if(this.defeated||this.finished)return;this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount,source});
     if(this.attack&&this.attack.phase==='windup'&&amount>=40){this.attack=null;this.nextAttack=2.5;this.onEvent({type:'interrupt'});}
     if(this.monsterHealth===0){this.defeated=true;this.attack=null;this.stars+=3+this.wave;this.respawn=3;this.heroHealth=Math.min(100,this.heroHealth+15);this.guardEnergy=Math.min(100,this.guardEnergy+30);this.onEvent({type:'defeat',wave:this.wave});}this.emit();}

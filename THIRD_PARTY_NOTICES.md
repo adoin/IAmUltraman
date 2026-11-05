@@ -6,7 +6,7 @@
 
 The creator's download page declares **CC-BY-NC** and asks users to credit Extrazhang. No license version is stated on that page. Creator profile: https://blendswap.com/profile/1180296 . The game and model derivative are noncommercial.
 
-Modifications: first-person arm extraction from the original continuous body mesh; simplified 18-bone deform skeleton for each arm with preserved finger skinning; surface smoothing; conversion of the original Multi-Type texture and Eevee shaders to portable PBR materials; first-person action adaptation. Source provenance and original-file SHA-256 are retained in `art/sources/tiga/SOURCE.md`. No original drivers or scripts are executed by the website.
+Modifications: first-person arm extraction from the original continuous body mesh; simplified 18-bone deform skeleton for each arm with preserved finger skinning; surface smoothing; conversion of the original Multi-Type texture and Eevee shaders to portable PBR materials, including calibrated suit colors and separate silver/suit metallic-roughness responses; project-authored shoulder, elbow, wrist and finger action poses. Source provenance and original-file SHA-256 are retained in `art/sources/tiga/SOURCE.md`. No original drivers or scripts are executed by the website.
 
 The on-screen **制作与鸣谢** presents this attribution and modification notice. This is community fan art, with no official affiliation asserted.
 

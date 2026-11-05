@@ -44,6 +44,12 @@
 
 派生可编辑文件为 `models/tiga-first-person.blend`，颜色贴图为 `textures/tiga/tiga-multi-color.jpg`，输出仍为网页既有 `hero-hands.glb` 接口。`models/hero-hands.blend` 是归档的旧几何拼接版本；当迪迦派生源存在时，`create_models.py` 不会覆盖新手臂。
 
+`tiga-multi-color.jpg` 保留原始贴图的缩小版本；运行时使用适配物理灯光的 `tiga-pbr-color.jpg` 与 `tiga-metal-rough.png`。后者按原图的红紫衣料/银色区域分配不同的金属度与粗糙度，缓和原 toon 材质颜色直接用于 PBR 后的高饱和塑料感，不改变作者的 UV 图案。两张运行时纹理嵌入 GLB，无额外下载依赖。
+
+每个 `HeroArmL/R` 节点的 `bone_tips` 元数据记录 glTF Y-up 空间中的实际骨尾位置，供运行时准确计算五指末端；不能从骨骼名称猜测关节轴向。动画控制器先校准原始骨架的掌面和骨骼滚转，再用四元数驱动肘腕与分指姿态。手刀的并指、拇指收拢与拳头的屈指分别处理，避免反折到手背。
+
+梅特里姆姿态的视觉参考为万代魂、圆谷监修的 [S.H.Figuarts Ultraman Ace](https://tamashiiweb.com/item/13206/) 官方展示：四指并拢的竖直手刀，另一只手掌心朝上托住肘部。仅用于动作观察，参考图片没有进入仓库或发行包。本站角色仍是已署名的迪迦社区模型，动作是本项目编排的游戏动画。
+
 角色模型和衍生物按原下载页的 CC BY-NC 用于非商业游戏；公共页面的“制作与鸣谢”和 `THIRD_PARTY_NOTICES.md` 均保留作者、来源、许可标签及修改说明。没有执行或向网页导出原文件的旧驱动、控制器和脚本。
 
 ## 造型与色彩

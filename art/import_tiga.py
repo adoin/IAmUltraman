@@ -4,6 +4,7 @@ blender --background --factory-startup --disable-autoexec --python art/import_ti
 The original is retained unchanged in art/sources/tiga. Never enable its legacy drivers.
 """
 import bpy,bmesh,math,json
+import numpy as np
 from pathlib import Path
 from mathutils import Vector,Matrix
 
@@ -25,8 +26,26 @@ polygons=[(list(p.vertices),p.material_index,[tuple(body.data.uv_layers.active.d
 bones={b.name:{'head':source_rig.matrix_world@b.head_local,'tail':source_rig.matrix_world@b.tail_local}for b in source_rig.data.bones}
 image=next(i for i in bpy.data.images if i.name.startswith('Tiga_body_Multi'))
 image.scale(2048,2048);image.filepath_raw=str(TEXTURES/'tiga-multi-color.jpg');image.file_format='JPEG';image.save()
-color_image=bpy.data.images.load(str(TEXTURES/'tiga-multi-color.jpg'),check_existing=False)
-color_image.name='Tiga Multi-Type Base Color';color_image.colorspace_settings.name='sRGB';color_image.pack()
+# The original flat colors were inputs to an Eevee toon shader. Calibrate those
+# color regions for the game's physical lights, keeping the author's UV layout.
+# Silver panels receive their own metallic/roughness response instead of sharing
+# the colored suit's plastic-looking material. The original source stays untouched.
+pixels=np.empty(len(image.pixels),dtype=np.float32);image.pixels.foreach_get(pixels)
+rgba=pixels.reshape((-1,4));rgb=rgba[:,:3].copy();r,g,b=rgb.T
+violet=np.clip((b-r-.08)/.35,0,1)*np.clip((b-g-.08)/.35,0,1)
+red=np.clip((r-np.maximum(g,b)-.08)/.6,0,1)
+value=np.clip(rgb.max(axis=1)/.92,.3,1.1)[:,None]
+for mask,color in [(violet,(112/255,94/255,160/255)),(red,(176/255,40/255,61/255))]:
+    rgba[:,:3]+=mask[:,None]*(np.array(color)*value-rgb)
+def save_texture(name,filename,data,space,format):
+    result=bpy.data.images.new(name,width=2048,height=2048,alpha=False)
+    result.colorspace_settings.name=space;result.pixels.foreach_set(data.reshape(-1))
+    result.filepath_raw=str(TEXTURES/filename);result.file_format=format;result.save();result.pack()
+    return result
+color_image=save_texture('Tiga Multi-Type PBR Color','tiga-pbr-color.jpg',rgba,'sRGB','JPEG')
+colored=np.maximum(violet,red);orm=np.ones_like(rgba)
+orm[:,1]=.42+colored*.22;orm[:,2]=.55-colored*.42
+surface_image=save_texture('Tiga Suit and Silver Surface','tiga-metal-rough.png',orm,'Non-Color','PNG')
 
 # Replace view-dependent Eevee toon node groups with portable PBR materials.
 def material(name,color,metal,rough,texture=False):
@@ -37,6 +56,11 @@ def material(name,color,metal,rough,texture=False):
     if texture:
         node=m.node_tree.nodes.new('ShaderNodeTexImage');node.image=color_image
         m.node_tree.links.new(node.outputs['Color'],bsdf.inputs['Base Color'])
+        surface=m.node_tree.nodes.new('ShaderNodeTexImage');surface.image=surface_image
+        channels=m.node_tree.nodes.new('ShaderNodeSeparateColor')
+        m.node_tree.links.new(surface.outputs['Color'],channels.inputs['Color'])
+        m.node_tree.links.new(channels.outputs['Green'],bsdf.inputs['Roughness'])
+        m.node_tree.links.new(channels.outputs['Blue'],bsdf.inputs['Metallic'])
     return m
 silver=material('Tiga silver armor',(.58,.62,.65),.45,.4)
 suit=material('Tiga Multi-Type suit',(1,1,1),.15,.55,True)
@@ -118,6 +142,8 @@ for side,offset in [('L',-.6),('R',.6)]:
         bone.align_roll(Vector((0,1,0)));bone.use_deform=True
         if parent:bone.parent=armature.edit_bones[parent]
     bpy.ops.object.mode_set(mode='OBJECT');rig.select_set(False)
+    root['bone_tips']={name:[point(tail).x,point(tail).z,-point(tail).y] for name,head,tail,parent in definitions}
+    root['bone_tips_space']='GLTF_Y_UP'
     arm_mesh.parent=rig
     modifier=arm_mesh.modifiers.new('Tiga skeletal skinning','ARMATURE');modifier.object=rig;modifier.use_deform_preserve_volume=False
     metadata[side]={'vertices':len(arm_mesh.data.vertices),'polygons':len(arm_mesh.data.polygons),'bones':group_names,'normalization':size}

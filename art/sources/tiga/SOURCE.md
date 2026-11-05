@@ -15,4 +15,6 @@ Runtime derivative: `public/models/kaiju/hero-hands.glb`.
 Editable derivative: `art/models/tiga-first-person.blend`.
 Texture derivative: `art/textures/tiga/tiga-multi-color.jpg`.
 
+The physical-material adaptation additionally produces `tiga-pbr-color.jpg` (muted suit colors, original UV patterns) and `tiga-metal-rough.png` (separate silver and colored-suit responses). The exported skeleton includes exact bone-tip metadata. Runtime actions articulate shoulders, elbows, wrists and individual fingers, including blade-hand adduction, palm-side thumb poses and closed fists. These are project-authored adaptations, not animations supplied by the original creator.
+
 Public attribution is shown in the preparation screen's **制作与鸣谢**, including the author, source, original license label, and modification description. The model and its derivatives are for this noncommercial game; no official affiliation is claimed.
