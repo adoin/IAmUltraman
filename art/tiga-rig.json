@@ -1,0 +1,52 @@
+{
+  "L": {
+    "vertices": 11160,
+    "polygons": 11158,
+    "bones": [
+      "UpperArm_L",
+      "LowerArm_L",
+      "Hand_L",
+      "Index1_L",
+      "Index2_L",
+      "Index3_L",
+      "Mid1_L",
+      "Mid2_L",
+      "Mid3_L",
+      "Ring1_L",
+      "Ring2_L",
+      "Ring3_L",
+      "Pinky1_L",
+      "Pinky2_L",
+      "Pinky3_L",
+      "Thumb1_L",
+      "Thumb2_L",
+      "Thumb3_L"
+    ],
+    "normalization": 2.355159934085979
+  },
+  "R": {
+    "vertices": 11160,
+    "polygons": 11158,
+    "bones": [
+      "UpperArm_R",
+      "LowerArm_R",
+      "Hand_R",
+      "Index1_R",
+      "Index2_R",
+      "Index3_R",
+      "Mid1_R",
+      "Mid2_R",
+      "Mid3_R",
+      "Ring1_R",
+      "Ring2_R",
+      "Ring3_R",
+      "Pinky1_R",
+      "Pinky2_R",
+      "Pinky3_R",
+      "Thumb1_R",
+      "Thumb2_R",
+      "Thumb3_R"
+    ],
+    "normalization": 2.355159934085979
+  }
+}

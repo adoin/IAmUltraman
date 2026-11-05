@@ -1,12 +1,22 @@
 # Third-party notices
 
+## Ultraman Tiga — first-person arms
+
+"Ultraman Tiga" by **Extrazhang**, obtained from https://blendswap.com/blend/26877 and https://blendswap.com/blend/26877/download.
+
+The creator's download page declares **CC-BY-NC** and asks users to credit Extrazhang. No license version is stated on that page. Creator profile: https://blendswap.com/profile/1180296 . The game and model derivative are noncommercial.
+
+Modifications: first-person arm extraction from the original continuous body mesh; simplified 18-bone deform skeleton for each arm with preserved finger skinning; surface smoothing; conversion of the original Multi-Type texture and Eevee shaders to portable PBR materials; first-person action adaptation. Source provenance and original-file SHA-256 are retained in `art/sources/tiga/SOURCE.md`. No original drivers or scripts are executed by the website.
+
+The on-screen **制作与鸣谢** presents this attribution and modification notice. This is community fan art, with no official affiliation asserted.
+
 ## Three.js
 
 Three.js 0.180.0, copyright 2010-2025 three.js authors. MIT license, full text in public/vendor/three/LICENSE. Runtime modules and GLTFLoader are copied from the pinned npm package by scripts/build.mjs.
 
 ## Original game models
 
-The basalt, leviathan, nova and hero-hands models were authored for this project using art/create_models.py in Blender. They do not use downloaded character meshes, textures or animations. Editable masters are in art/models; runtime GLBs in public/models/kaiju. Runtime movement animates their named node pivots. These are original simplified creatures and gauntlets, not official Ultraman character assets.
+The basalt, leviathan and nova creature models were authored for this project using art/create_models.py in Blender. They do not use downloaded creature meshes, textures or animations. Editable masters are in art/models; runtime GLBs in public/models/kaiju. Runtime movement animates their named node pivots. The original procedural gauntlet master remains as an archived source; the current first-person arms use the separately attributed Tiga derivative above.
 
 ## MediaPipe Tasks Vision
 

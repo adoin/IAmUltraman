@@ -1,6 +1,6 @@
 # 模型制作与替换
 
-本版通过本机 Blender 5.2 制作了三种原创怪兽和一对第一人称红银护臂。`.blend` 是可编辑源文件；浏览器加载导出的 `.glb`。Three.js 负责镜头、灯光、动画、技能、碰撞时机及画面渲染，不能直接打开 `.blend`。
+三种怪兽由本项目用 Blender 5.2 制作；当前第一人称手臂基于 Extrazhang 的迪迦模型（CC BY-NC）适配。`.blend` 是可编辑源文件；浏览器加载导出的 `.glb`。Three.js 负责镜头、灯光、动画、技能、碰撞时机及画面渲染，不能直接打开 `.blend`。
 
 ## 文件
 
@@ -9,17 +9,17 @@
 | models/basalt.blend | ../public/models/kaiju/basalt.glb | 岩甲兽，岩甲与近战技能 |
 | models/leviathan.blend | ../public/models/kaiju/leviathan.glb | 潮汐兽，头鳍与横扫技能 |
 | models/nova.blend | ../public/models/kaiju/nova.glb | 星焰龙，双翼、冠角、最终战 |
-| models/hero-hands.blend | ../public/models/kaiju/hero-hands.glb | 第一人称护臂与双手 |
+| models/tiga-first-person.blend | ../public/models/kaiju/hero-hands.glb | Extrazhang 迪迦模型的第一人称蒙皮双臂，CC BY-NC |
 
-怪兽朝 Blender -Y 方向，Z 轴向上；导出 glTF 后朝 +Z，Y 轴向上。所有材质使用 Principled BSDF，无外部纹理。模型在游戏中通过 Body、Head、Jaw、ArmL/R、ForearmL/R、Tail、WingL/R 节点动画，不依赖骨骼。修改模型时保留这些命名枢轴和局部原点。身体枢轴初始高度 4.9，头、手臂的坐标相对父节点。
+怪兽朝 Blender -Y 方向，Z 轴向上；导出 glTF 后朝 +Z，Y 轴向上。怪兽材质使用 Principled BSDF，无外部纹理；迪迦手臂使用原模型的打包颜色贴图。怪兽通过 Body、Head、Jaw、ArmL/R、ForearmL/R、Tail、WingL/R 节点动画，不依赖骨骼。修改怪兽时保留这些命名枢轴和局部原点。身体枢轴初始高度 4.9，头、手臂的坐标相对父节点。
 
-重建全部源模型（会覆盖这四个源文件和 GLB，手动编辑后请另存文件）：
+重建三只怪兽（会覆盖其源文件和 GLB；存在迪迦派生源时保留当前手臂，手动编辑后请另存文件）：
 
 ```powershell
 & 'D:/software/Blender/blender.exe' --background --factory-startup --python art/create_models.py
 ```
 
-手动编辑：在 Blender 打开 .blend，完成后 File → Export → glTF 2.0，格式 GLB；不导出灯光、相机，本版由网页动画控制枢轴，因此无需导出动画。随后 npm run build 并运行浏览器测试。
+手动编辑：在 Blender 打开 .blend，完成后 File → Export → glTF 2.0，格式 GLB；不导出灯光、相机，网页驱动枢轴或骨骼，因此无需导出动画片段。迪迦手臂必须保留变形骨骼、蒙皮权重和纹理。随后 npm run build 并运行浏览器测试。
 
 ## 免费外部模型路线
 
@@ -31,6 +31,20 @@
 ## 验证记录
 
 模型可由脚本重建，网页从同源加载，三种怪兽各自有独立网格细节与轮廓。发布前使用实际浏览器分别检查三个模型、手部、技能与低画质路径，参见项目 README 的测试说明。
+
+## 当前第一人称迪迦手臂
+
+`sources/tiga/Ultraman Tiga.blend` 是用户从 BlendSwap 下载的 Extrazhang 原始模型，保持原样。来源与署名见 `sources/tiga/SOURCE.md`。原人物有约 200 根控制/变形骨骼，原始 Eevee 材质含视角相关节点组，直接导出不能保持同样效果。本项目提取其连续手臂网格，保留 UV 与 Multi-Type 颜色贴图，转换成 PBR；每侧使用 18 根 FK 变形骨骼，保留五指和四权重蒙皮。
+
+重新生成：
+
+```powershell
+& 'D:/software/Blender/blender.exe' --background --factory-startup --disable-autoexec --python art/import_tiga.py
+```
+
+派生可编辑文件为 `models/tiga-first-person.blend`，颜色贴图为 `textures/tiga/tiga-multi-color.jpg`，输出仍为网页既有 `hero-hands.glb` 接口。`models/hero-hands.blend` 是归档的旧几何拼接版本；当迪迦派生源存在时，`create_models.py` 不会覆盖新手臂。
+
+角色模型和衍生物按原下载页的 CC BY-NC 用于非商业游戏；公共页面的“制作与鸣谢”和 `THIRD_PARTY_NOTICES.md` 均保留作者、来源、许可标签及修改说明。没有执行或向网页导出原文件的旧驱动、控制器和脚本。
 
 ## 造型与色彩
 

@@ -1,6 +1,6 @@
 # 光之小英雄
 
-面向儿童的第一人称 3D 体感游戏。Three.js 渲染巨人视角的城市、自己的护臂与面前的怪兽；MediaPipe 在本机分析动作。三种原创 Blender 怪兽、五波战斗、光线/光轮、防御/闪避、四类怪兽技能、星星奖励与合成音效。部署于 https://adoin.github.io/ultraman-play/ 。
+面向儿童的第一人称 3D 体感游戏。Three.js 渲染巨人视角的城市、迪迦的蒙皮手臂与面前的怪兽；MediaPipe 在本机分析动作。三种原创 Blender 怪兽、五波战斗、光线/光轮、防御/闪避、四类怪兽技能、星星奖励与合成音效。部署于 https://adoin.github.io/ultraman-play/ 。
 
 ## 本地运行
 
@@ -17,7 +17,11 @@ npm run dev
 
 ## 3D 模型
 
-`art/models/*.blend` 是 Blender 可编辑源文件，`public/models/kaiju/*.glb` 是网页模型。建模与免费模型来源说明见 [art/README.md](art/README.md)。使用本机 Blender 的后台模式生成，没有修改用户已打开的 Blender 项目。动画由模型的命名枢轴驱动，包含呼吸、蓄力、抬臂、张嘴、尾部与翅膀摆动、冲锋和退场。
+`art/models/*.blend` 是 Blender 可编辑源文件，`public/models/kaiju/*.glb` 是网页模型。建模与免费模型来源说明见 [art/README.md](art/README.md)。使用本机 Blender 的后台模式生成，没有修改用户已打开的 Blender 项目。怪兽动画由命名枢轴驱动；迪迦手臂来自 Extrazhang 的连续人物网格，每侧保留 18 根变形骨骼，使用真实蒙皮控制手指弯曲。GLB 纹理和蒙皮着色器在准备界面做离屏预热。
+
+准备界面的“鸣谢”列出模型作者、来源、CC BY-NC 许可及适配说明，并列出 Three.js、MediaPipe、Noto Sans SC 的来源和许可；战斗中该入口与其他 HUD 一同隐藏。本游戏与迪迦模型衍生物为非商业使用。源文件、许可出处、哈希和修改记录见 [art/sources/tiga/SOURCE.md](art/sources/tiga/SOURCE.md)。
+
+`npm run test:tiga` 验证实际 SkinnedMesh、骨骼数、权重归一化、指尖蒙皮位移、纹理、作者元数据、鸣谢及手机动作画幅。
 
 ## 战斗
 
@@ -50,7 +54,7 @@ npm run dev
 
 ## 第三方
 
-Three.js 0.180.0：MIT。MediaPipe Tasks Vision 0.10.32：Apache-2.0。Pose Landmarker Lite 模型来自 Google 官方模型分发。详见 `THIRD_PARTY_NOTICES.md`。本项目为非官方同人体感游戏，怪兽与护臂为原创简化模型，未使用官方影视、音乐或贴图。
+Three.js 0.180.0：MIT。MediaPipe Tasks Vision 0.10.32：Apache-2.0。Pose Landmarker Lite 模型来自 Google 官方模型分发。迪迦手臂基于 Extrazhang 的社区模型（CC BY-NC），怪兽为本项目原创。详见 `THIRD_PARTY_NOTICES.md`。本项目为非官方、非商业同人体感游戏。
 
 ## 技能光效检查
 

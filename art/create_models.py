@@ -295,4 +295,7 @@ def hands():
 
 for kind in ['basalt','leviathan','nova']:
     monster(kind)
-hands()
+if not (MASTERS/'tiga-first-person.blend').exists():
+    hands()
+else:
+    print('Preserving the imported Tiga first-person arms; rebuild with art/import_tiga.py')

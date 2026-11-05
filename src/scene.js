@@ -53,8 +53,15 @@ export class BattleScene extends BattleEngine {
     const reticle=new THREE.Group();this.camera.add(reticle);reticle.visible=false;const m=glow(0x9ef9ef,.65);for(const axis of [0,1])this.mesh(new THREE.PlaneGeometry(axis?.003:.03,axis?.03:.003),m,V(0,0,-2),reticle);reticle.position.y=-.06;
     this.impactVeil=this.mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({color:0xff785b,transparent:true,opacity:0,depthTest:false,depthWrite:false}),V(0,0,-.2),this.camera);this.impactVeil.renderOrder=100;
   }
-  async loadAssets(){const loader=new GLTFLoader();const revision=new URL(import.meta.url).searchParams.get('v')||'local';await Promise.all(['basalt','leviathan','nova','hero-hands'].map(async name=>{const gltf=await loader.loadAsync(new URL(`../public/models/kaiju/${name}.glb?v=${revision}`,import.meta.url).href);const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=name!=='hero-hands';o.receiveShadow=true;if(o.material)o.material.side=THREE.DoubleSide;}});this.models.set(name,model);}));
-    const handRoot=this.models.get('hero-hands');this.hands.add(handRoot);for(const tag of ['L','R']){const arm=handRoot.getObjectByName('HeroArm'+tag);this.handMeshes.push(arm);}this.assetReady=true;this.selectMonster();this.clientEvent({type:'assets-ready'});
+  async loadAssets(){const loader=new GLTFLoader();const revision=new URL(import.meta.url).searchParams.get('v')||'local';await Promise.all(['basalt','leviathan','nova','hero-hands'].map(async name=>{const gltf=await loader.loadAsync(new URL(`../public/models/kaiju/${name}.glb?v=${revision}`,import.meta.url).href);const model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=name!=='hero-hands';o.receiveShadow=name!=='hero-hands';if(name==='hero-hands')o.frustumCulled=false;if(o.material)o.material.side=name==='hero-hands'?THREE.FrontSide:THREE.DoubleSide;}});this.models.set(name,model);}));
+    const handRoot=this.models.get('hero-hands');this.hands.add(handRoot);for(const tag of ['L','R']){const arm=handRoot.getObjectByName('HeroArm'+tag);this.handMeshes.push(arm);}this.warmViewmodel();this.assetReady=true;this.selectMonster();this.clientEvent({type:'assets-ready'});
+  }
+  warmViewmodel(){
+    const target=new THREE.WebGLRenderTarget(64,64),previous=this.renderer.getRenderTarget();
+    this.handMeshes.forEach((arm,i)=>{arm.position.set(i===0?-.79:.79,-1.05,-1.65);arm.scale.setScalar(.8);});
+    this.hands.visible=true;
+    try{this.renderer.setRenderTarget(target);this.renderer.render(this.renderScene,this.camera);this.viewmodelReady=true;}
+    finally{this.renderer.setRenderTarget(previous);this.hands.visible=false;target.dispose();}
   }
   selectMonster(){if(!this.assetReady)return;if(this.currentMonster)this.renderScene.remove(this.currentMonster);this.currentMonster=this.models.get(this.waveInfo.model);this.currentMonster.position.set(0,0,-15);this.currentMonster.scale.setScalar(this.wave===5?1.8:1.5);this.renderScene.add(this.currentMonster);this.currentMonster.visible=true;this.pivots={};for(const name of ['Body','Head','Jaw','ArmL','ArmR','ForearmL','ForearmR','Tail','WingL','WingR']){const pivot=this.currentMonster.getObjectByName(name);if(pivot){pivot.rotation.set(0,0,0);this.pivots[name]=pivot;}}
     this.monsterLight.color.setHex(this.waveInfo.color);this.targetRing.material.color.setHex(this.waveInfo.color);this.clearTransient();
@@ -119,9 +126,30 @@ export class BattleScene extends BattleEngine {
     if(p.ArmL){p.ArmL.rotation.x=a?.kind==='slam'?-winding*2.3:idle-.1-winding*.6;p.ArmL.rotation.z=-.12-(a?.kind==='sweep'&&a.safeSide>0?winding*.8:0);}if(p.ArmR){p.ArmR.rotation.x=a?.kind==='slam'?-winding*2.3:-idle-.1-winding*.6;p.ArmR.rotation.z=.12+(a?.kind==='sweep'?winding*.8:0);}if(p.ForearmL)p.ForearmL.rotation.x=-.32+idle+winding*.12;if(p.ForearmR)p.ForearmR.rotation.x=-.42-idle+winding*.12;if(p.Tail)p.Tail.rotation.y=Math.sin(t*1.3)*.16;if(p.WingL)p.WingL.rotation.y=Math.sin(t*1.4)*.16;if(p.WingR)p.WingR.rotation.y=-Math.sin(t*1.4)*.16;
     this.warningRing.visible=false;this.warningRing.material.opacity=.35+Math.sin(t*10)*.2;this.warningRing.scale.setScalar(1+winding*.15);this.safeZone.visible=false;if(a)this.safeZone.position.x=a.safeSide*6;this.monsterLight.intensity=winding*12+this.hitFlash*20;
   }
+  start(){
+    super.start();this.guardAmount=0;this.guardWasActive=false;this.shieldIgnition=0;this.defenseFlash=0;this.hurt=0;this.hitFlash=0;
+    if(this.hands)this.hands.visible=false;if(this.shield)this.shield.material.opacity=0;if(this.shieldGlow)this.shieldGlow.material.opacity=0;
+    for(const arm of this.handMeshes||[]){const pose=this.handRigBindings?.get(arm);if(pose){pose.grip=0;for(const binding of pose.bindings)binding.bone.quaternion.copy(binding.base);}}
+  }
+  poseTigaFingers(arm,side,target,dt){
+    this.handRigBindings??=new WeakMap();let pose=this.handRigBindings.get(arm);
+    if(!pose){
+      pose={bindings:[],grip:0};
+      for(const finger of ['Index','Mid','Ring','Pinky','Thumb'])for(let joint=1;joint<=3;joint++){
+        const bone=arm.getObjectByName(finger+joint+'_'+side);
+        if(bone)pose.bindings.push({bone,base:bone.quaternion.clone(),finger,joint});
+      }
+      this.handRigBindings.set(arm,pose);
+    }
+    pose.grip=mix(pose.grip,target,1-Math.exp(-dt*35));
+    for(const binding of pose.bindings){
+      const angle=(binding.finger==='Thumb'?[.55,.9,.75]:[1.25,1.55,.95])[binding.joint-1]*pose.grip;
+      binding.bone.quaternion.copy(binding.base).multiply(new THREE.Quaternion().setFromAxisAngle(V(1,0,0),angle));
+    }
+  }
   animateHands(dt){const factor=1-Math.exp(-dt*10);this.renderLean=mix(this.renderLean,this.lean,factor);const guard=this.guard&&this.guardEnergy>0?1:0;if(guard&&!this.guardWasActive)this.shieldIgnition=.55;this.guardWasActive=guard;this.shieldIgnition=Math.max(0,(this.shieldIgnition||0)-dt);this.guardAmount=mix(this.guardAmount,guard,factor);const latest=this.effects.find(e=>e.kind==='beam'),disc=this.effects.find(e=>e.kind==='disc'),punch=this.effects.find(e=>e.kind==='punch');this.hands.visible=!!(latest||disc||punch||this.guardAmount>.02);
     this.camera.position.x=this.renderLean*4.5;this.camera.position.y=9+(this.reduced?0:Math.sin(this.time*1.4)*.025);this.camera.rotation.z=this.reduced?0:-this.renderLean*.035;this.camera.rotation.y=-this.renderLean*.025;
-    this.handMeshes.forEach((arm,i)=>{const side=i===0?-1:1,g=this.guardAmount;let x=side*.79,y=-1.05,z=-1.65,rx=-.48,rz=-side*.24;if(latest){const strength=Math.sin(Math.min(1,latest.age/.18)*Math.PI/2);x=mix(x,i===0?-.28:.16,strength);y=mix(y,i===0?-.96:-.75,strength);z=mix(z,-1.9,strength);rz=mix(rz,i===0?-1.42:.06,strength);rx=0;}if(punch&&((punch.side==='left'&&i===0)||(punch.side==='right'&&i===1))){const thrust=Math.sin(punch.age/punch.duration*Math.PI);x=mix(x,side*.13,thrust);y=mix(y,-.05,thrust);z=mix(z,-3.1,thrust);rx=mix(rx,-1.15,thrust);rz=mix(rz,0,thrust);}for(let finger=0;finger<4;finger++){const node=arm.getObjectByName('Finger'+(i===0?'L':'R')+finger);if(node)node.rotation.x=punch?2.6:0;}if(disc&&i===1){const p=disc.age/disc.duration;x+=Math.sin(p*Math.PI)*.65;y+=Math.sin(p*Math.PI)*.45;rx-=Math.sin(p*Math.PI)*1.1;}arm.position.set(mix(x,side*.54,g),mix(y,-.24,g)+(this.reduced?0:Math.sin(this.time*1.6+i)*.014),mix(z,-1.4,g));arm.rotation.set(mix(rx,0,g),0,mix(rz,-side*.18,g));arm.scale.setScalar(latest?.46:.6);});
+    this.handMeshes.forEach((arm,i)=>{const side=i===0?-1:1,g=this.guardAmount;let x=side*.79,y=-1.05,z=-1.65,rx=-.48,rz=-side*.24;if(latest){const strength=Math.sin(Math.min(1,latest.age/.18)*Math.PI/2);x=mix(x,i===0?-.28:.16,strength);y=mix(y,i===0?-.96:-.75,strength);z=mix(z,-1.9,strength);rz=mix(rz,i===0?-1.42:.06,strength);rx=0;}if(punch&&((punch.side==='left'&&i===0)||(punch.side==='right'&&i===1))){const thrust=Math.sin(punch.age/punch.duration*Math.PI);x=mix(x,side*.13,thrust);y=mix(y,-.12,thrust);z=mix(z,-2.3,thrust);rx=mix(rx,-1.15,thrust);rz=mix(rz,0,thrust);}this.poseTigaFingers(arm,i===0?'L':'R',punch?1:guard?.02:latest?0:disc?.18:.12,dt);if(disc&&i===1){const p=disc.age/disc.duration;x+=Math.sin(p*Math.PI)*.65;y+=Math.sin(p*Math.PI)*.45;rx-=Math.sin(p*Math.PI)*1.1;}arm.position.set(mix(x,side*.54,g)*(this.camera.aspect<1?this.camera.aspect*.75:1),mix(y,-.24,g)+(this.reduced?0:Math.sin(this.time*1.6+i)*.014),mix(z,-1.4,g));arm.rotation.set(mix(rx,0,g),0,mix(rz,-side*(this.camera.aspect<1?0:.18),g));arm.scale.setScalar(this.camera.aspect<1&&!punch?mix(latest?.65:.8,.65,g):latest?.65:.8);});
     this.shield.material.opacity=this.guardAmount*.07+this.defenseFlash*.09+this.shieldIgnition*.09;this.shieldGlow.material.opacity=this.guardAmount*.28+this.defenseFlash*.35+this.shieldIgnition*.65;this.shieldGlow.rotation.z=this.time*.1;this.hurt=Math.max(0,this.hurt-dt);this.defenseFlash=Math.max(0,this.defenseFlash-dt);this.hitFlash=Math.max(0,this.hitFlash-dt);this.impactVeil.material.opacity=this.hurt*.13;
   }
   animateEffects(dt){for(const e of this.visualEffects){e.age+=dt;const t=clamp(e.age/e.duration,0,1);if(e.kind==='disc'){
