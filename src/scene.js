@@ -117,7 +117,7 @@ export class BattleScene extends BattleEngine {
       for(let i=0;i<16;i++){const a=i*Math.PI/8;const tooth=this.mesh(new THREE.ConeGeometry(.045,.11,3),glow(0xffe4a3),V(Math.cos(a)*.395,Math.sin(a)*.395,0),disc);tooth.rotation.z=a-Math.PI/2;}
       entry.halo=this.flare(V(),0xffb746,1.35,disc,.25);
       entry.trail=[];for(let i=0;i<6;i++)entry.trail.push(this.flare(start,0xffca69,.75-i*.07,group,.22-i*.025));
-      const light=new THREE.PointLight(0xffcc70,16,10,1.5);disc.add(light);entry.discSize=this.camera.aspect<1?.8:1;
+      const light=new THREE.PointLight(0xffcc70,16,10,1.5);disc.add(light);entry.discSize=(this.camera.aspect<1?.8:1)*this.hero.lens.scale;
     }
     this.visualEffects.push(entry);
   }

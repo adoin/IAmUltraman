@@ -1,27 +1,28 @@
 import * as THREE from 'three';
 import {BEAM_TIMING,DISC_TIMING} from './action-timing.js';
+import {ViewmodelLens} from './viewmodel-lens.js';
 
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
 const q=()=>new THREE.Quaternion();
 const clamp=THREE.MathUtils.clamp;
-const ease=t=>{t=clamp(t,0,1);return t*t*t*(t*(t*6-15)+10);};
+const ease=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
 const fingers=['Index','Mid','Ring','Pinky'];
 const shapes=['rest','fist','blade','shield','disc'];
-const armScale=aspect=>aspect<1?.62:.68;
 
 function frame(forward,normal){
   const y=forward.clone().normalize();
   let z=normal.clone().addScaledVector(y,-normal.dot(y));
-  if(z.lengthSq()<.001)z=v(0,0,1).addScaledVector(y,-y.z);
+  if(z.lengthSq()<.001){const alternate=Math.abs(y.z)<.85?v(0,0,1):v(1,0,0);z=alternate.clone().addScaledVector(y,-alternate.dot(y));}
   z.normalize();const x=y.clone().cross(z).normalize();z=x.clone().cross(y).normalize();
   return q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x,y,z));
 }
-function state(wrist,forearm,normal,upper,preset,scale=.76,handForward=forearm){
-  return {wrist,forearm:frame(forearm,normal),hand:frame(handForward,normal),upper:upper.normalize(),shape:{[preset]:1},scale};
+function state(upper,forearm,normal,preset,handForward=forearm){
+  return {upper:upper.normalize(),forearm:frame(forearm,normal),hand:frame(handForward,normal),shape:{[preset]:1}};
 }
-function copyPose(p){return{wrist:p.wrist.clone(),forearm:p.forearm.clone(),hand:p.hand.clone(),upper:p.upper.clone(),shape:{...p.shape},scale:p.scale};}
+function copyPose(p){return{forearm:p.forearm.clone(),hand:p.hand.clone(),upper:p.upper.clone(),shape:{...p.shape}};}
 function blend(a,b,t){t=ease(t);const shape={};for(const n of shapes)shape[n]=(a.shape[n]||0)*(1-t)+(b.shape[n]||0)*t;
-  return {wrist:a.wrist.clone().lerp(b.wrist,t),forearm:a.forearm.clone().slerp(b.forearm,t),hand:a.hand.clone().slerp(b.hand,t),upper:a.upper.clone().lerp(b.upper,t).normalize(),shape,scale:THREE.MathUtils.lerp(a.scale,b.scale,t)};
+  const swing=q().setFromUnitVectors(a.upper,b.upper);
+  return {forearm:a.forearm.clone().slerp(b.forearm,t),hand:a.hand.clone().slerp(b.hand,t),upper:a.upper.clone().applyQuaternion(q().slerp(swing,t)),shape};
 }
 
 class ArmRig {
@@ -36,6 +37,21 @@ class ArmRig {
     this.restHandQ=rootInv.clone().multiply(this.hand.getWorldQuaternion(q()));
     this.shoulder=this.point(this.upper);this.elbow=this.point(this.lower);this.wrist=this.point(this.hand);
     this.upperLength=this.shoulder.distanceTo(this.elbow);this.lowerLength=this.elbow.distanceTo(this.wrist);
+    // The legacy GLB has the same mesh but no eye-to-shoulder extras.
+    this.eyeOffset=v().fromArray(root.userData.eye_to_shoulder??[side==='L'?-.80965:.80965,-.78857,.65208]);
+    this.mount=v();
+    // Every vertex of the sleeve cut is bound to the upper arm. Its distance
+    // from the shoulder therefore bounds the cut at every arm orientation.
+    this.cutRadius=0;
+    root.updateMatrixWorld(true);
+    root.traverse(mesh=>{
+      if(!mesh.isSkinnedMesh||!mesh.material.name.includes('lining'))return;
+      mesh.skeleton.update();
+      for(let i=0;i<mesh.geometry.attributes.position.count;i++){
+        const point=root.worldToLocal(mesh.localToWorld(mesh.getVertexPosition(i,v())));
+        this.cutRadius=Math.max(this.cutRadius,point.distanceTo(this.shoulder));
+      }
+    });
     const across=this.point(this.nodes['Index1'+suffix]).sub(this.point(this.nodes['Pinky1'+suffix])).normalize().multiplyScalar(side==='L'?1:-1);
     this.long=this.tip('Mid').sub(this.point(this.nodes['Mid1'+suffix])).normalize();
     this.normal=across.clone().cross(this.long).normalize();this.across=this.long.clone().cross(this.normal).normalize();
@@ -101,75 +117,192 @@ class ArmRig {
   orient(bone,desiredCameraQ){const world=this.camera.getWorldQuaternion(q()).multiply(desiredCameraQ);bone.quaternion.copy(bone.parent.getWorldQuaternion(q()).invert().multiply(world));bone.updateWorldMatrix(false,true);}
   apply(pose){
     const forward=v(0,1,0).applyQuaternion(pose.forearm),normal=v(0,0,1).applyQuaternion(pose.forearm);
-    const elbow=pose.wrist.clone().addScaledVector(forward,-this.lowerLength*pose.scale);
-    const shoulder=elbow.clone().addScaledVector(pose.upper,this.upperLength*pose.scale);
-    this.root.quaternion.identity();this.root.scale.setScalar(pose.scale);this.root.position.copy(shoulder).addScaledVector(this.shoulder,-pose.scale);this.root.updateWorldMatrix(true,true);
-    this.orient(this.upper,frame(elbow.clone().sub(shoulder),normal).multiply(this.upperFrame).multiply(this.restUpperQ));
+    const elbow=this.mount.clone().addScaledVector(pose.upper,this.upperLength);
+    const wrist=elbow.clone().addScaledVector(forward,this.lowerLength);
+    this.root.quaternion.identity();this.root.scale.setScalar(1);this.root.position.copy(this.mount).sub(this.shoulder);this.root.updateWorldMatrix(true,true);
+    const upperRotation=frame(pose.upper,normal).multiply(this.upperFrame).multiply(this.restUpperQ);
+    this.orient(this.upper,upperRotation);
     this.orient(this.lower,pose.forearm.clone().multiply(this.lowerFrame).multiply(this.restLowerQ));
     this.orient(this.hand,pose.hand.clone().multiply(this.handFrame).multiply(this.restHandQ));
     this.applyShape(pose.shape);this.root.updateWorldMatrix(true,true);
-    this.current={wrist:pose.wrist.clone(),elbow,shoulder,forearm:forward,normal,shape:{...pose.shape}};
+    this.current={wrist,elbow,shoulder:this.mount.clone(),forearm:forward,normal,shape:{...pose.shape}};
   }
   metrics(){const cameraPoint=bone=>this.camera.worldToLocal(bone.getWorldPosition(v()));return{wrist:cameraPoint(this.hand),elbow:cameraPoint(this.lower),shoulder:cameraPoint(this.upper)};}
 }
 
 export class HeroAnimation {
-  constructor(arms,camera){this.camera=camera;this.rigs=arms.map((arm,i)=>new ArmRig(arm,i?'R':'L',camera));this.current=null;this.action=null;this.entry=null;this.guard=0;this.sockets={beam:v(),disc:v()};this.reset();}
-  neutral(aspect){const x=aspect<1?.42:.67;return[-1,1].map(side=>state(v(side*x,-1.65,-1.35),v(side*.15,1,-.1),v(0,0,1),v(side*.5,-.3,1),'rest',armScale(aspect)));}
-  beamPose(aspect){
-    const scale=armScale(aspect);
-    // A taller camera frustum needs a lower elbow so the shoulder cut stays below
-    // the image. Merely squeezing both arms sideways exposes the cut on phones.
-    const wristY=-.07-(Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))-Math.tan(THREE.MathUtils.degToRad(57/2)))*2.4+(scale-.68)*1.3;
-    const rightWrist=v(aspect<1?.12:.16,wristY,-2.35);
-    const right=state(rightWrist,v(0,1,0),v(1,0,0),v(.7,-.9,.55),'blade',scale);
-    const elbow=rightWrist.clone().add(v(0,-this.rigs[1].lowerLength*scale,0));
-    // The FOREARMS cross: the left forearm passes in front of the right one,
-    // with the crossing inside both elbow-to-wrist segments. Both hands are
-    // straight blades; the left palm faces the target instead of cupping upward.
-    const depth=-2.07,ratio=depth/rightWrist.z;
-    const crossing=elbow.clone().lerp(rightWrist,.43);
-    const crossPoint=v(crossing.x*ratio,crossing.y*ratio,depth);
-    // On narrow screens turn the entire left forearm into depth, keeping the
-    // wrist straight and its projected elbow-to-wrist line horizontal.
-    const yaw=clamp((1.05-aspect)/.60,0,1)*Math.PI/4;
-    const leftDirection=v(Math.cos(yaw),-Math.sin(yaw)*crossPoint.y/crossPoint.z,-Math.sin(yaw)).normalize();
-    const leftWrist=crossPoint.clone().addScaledVector(leftDirection,this.rigs[0].lowerLength*scale*.5);
-    const left=state(leftWrist,leftDirection,v(0,0,1),v(-.12,-1,Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))),'blade',scale);
-    return[left,right];
+  constructor(arms,camera){
+    this.camera=camera;
+    this.rigs=arms.map((arm,index)=>new ArmRig(arm,index?'R':'L',camera));
+    this.lens=new ViewmodelLens(camera,arms);
+    this.sockets={beam:v(),disc:v()};
+    this.reset();
   }
-  shieldPose(aspect){const x=aspect<1?.20:.48;return[-1,1].map(side=>state(v(side*x,-.23,-1.55),v(side*.05,1,-.12),v(0,0,1),v(side*.5,-.2,1),'shield',armScale(aspect)));}
-  punchPose(side,aspect,extended){const poses=this.shieldPose(aspect);for(const p of poses)p.shape={fist:1};const i=side==='left'?0:1,sign=i?1:-1;
-    poses[i]=state(extended?v(sign*.10,-.24,-2.0):v(sign*(aspect<1?.24:.48),-.65,-1.25),extended?v(sign*-.1,.15,-1):v(sign*.08,1,-.25),extended?v(0,1,0):v(0,0,1),v(sign*.65,-.35,1),'fist',armScale(aspect));
+
+  prepareLayout(){
+    const {aspect,fov}=this.camera;
+    if(aspect===this.aspect&&fov===this.fov)return;
+    this.aspect=aspect;
+    this.fov=fov;
+    this.narrow=clamp((1.4-aspect)/.94,0,1);
+    this.lens.resize(aspect);
+
+    // The eye midpoint and shoulder span come from Tiga's rest mesh. Turn the
+    // torso slightly into the stance and allow framing space in front of the
+    // eyes. Each shoulder stays at its mount throughout every action.
+    const stance=THREE.MathUtils.degToRad(18);
+    const vertical=Math.tan(THREE.MathUtils.degToRad(this.lens.camera.fov/2));
+    const horizontal=vertical*aspect;
+    let framingDepth=THREE.MathUtils.lerp(1.36,1.68,this.narrow);
+    // Fit the eye frame to the actual mesh. Place each cut wholly beyond a
+    // side or the bottom plane, including its full radius and a small margin.
+    for(const rig of this.rigs){
+      const eye=rig.eyeOffset;
+      rig.mount.set(eye.x*Math.cos(stance),eye.y,eye.z+eye.x*Math.sin(stance));
+      const radius=rig.cutRadius+.012;
+      const sideDepth=(Math.abs(rig.mount.x)-radius*Math.hypot(1,horizontal))/horizontal;
+      const lowerDepth=(-rig.mount.y-radius*Math.hypot(1,vertical))/vertical;
+      framingDepth=Math.min(framingDepth,rig.mount.z+Math.max(sideDepth,lowerDepth));
+    }
+    for(const rig of this.rigs)rig.mount.z-=framingDepth;
+
+    this.neutral=[-1,1].map(sign=>state(v(sign*.74,-.64,-.20),v(sign*.62,.65,-.43),v(0,0,1),'rest'));
+    this.shield=[-1,1].map(sign=>state(v(sign*.62,-.35,-.70),v(-sign*.60,.92,-.35),v(0,0,1),'shield'));
+    this.beam=this.beamPose();
+    this.discHeld=this.discPose(false);
+    this.discRelease=this.discPose(true);
+  }
+
+  beamPose(){
+    const [left,right]=this.rigs;
+    const mix=(wide,narrow)=>THREE.MathUtils.lerp(wide,narrow,this.narrow);
+    const x=mix(.265,.115),y=mix(-.46,-.77);
+    // Choose an open right elbow and solve its forward distance on the fixed
+    // upper-arm sphere. The forearm projects vertically through that elbow.
+    const reach=right.upperLength**2-(x-right.mount.x)**2-(y-right.mount.y)**2;
+    const elbow=v(x,y,right.mount.z-Math.sqrt(Math.max(0,reach)));
+    const pitch=mix(.98,.49);
+    const upright=v(-elbow.x/elbow.z*pitch,1,-pitch).normalize();
+    const blade=v(-elbow.x/elbow.z*.18,1,-.18);
+    const nearCross=elbow.clone().addScaledVector(upright,right.lowerLength*mix(.38,.47));
+
+    // The horizontal forearm passes on the monster side of the right one.
+    // Both centerlines project through one crossing, with room for the skin.
+    const separation=mix(.39,.44);
+    const farCross=nearCross.clone().multiplyScalar(1+separation/-nearCross.z);
+    const slope=farCross.y/-farCross.z;
+    const planeNormal=v(0,1,slope).normalize();
+    const intoDepth=v(0,slope,-1).normalize();
+    const offset=farCross.clone().sub(left.mount);
+    const height=offset.dot(planeNormal);
+    const planar=offset.clone().addScaledVector(planeNormal,-height);
+    const distance=planar.length();
+    const radius=Math.sqrt(Math.max(0,left.upperLength**2-height**2));
+    const bearing=Math.atan2(planar.dot(intoDepth),planar.x);
+    // Intersect the chosen horizontal line with the upper arm's reach circle.
+    // Bound the bearing so the crossing remains inside the left forearm.
+    const limit=Math.max(left.lowerLength*.72,distance-radius+.002);
+    const tangent=Math.sqrt(Math.max(0,distance**2-radius**2));
+    const halfAngle=limit<tangent
+      ?Math.acos(clamp((distance**2+limit**2-radius**2)/(2*distance*limit),-1,1))
+      :Math.asin(clamp(radius/distance,0,1));
+    const yaw=clamp(THREE.MathUtils.degToRad(mix(31,48)),bearing-halfAngle,bearing+halfAngle);
+    const across=v(Math.cos(yaw),0,0).addScaledVector(intoDepth,Math.sin(yaw)).normalize();
+    const along=planar.dot(across);
+    const toCross=along-Math.sqrt(Math.max(0,radius**2-distance**2+along**2));
+    const leftElbow=farCross.clone().addScaledVector(across,-toCross);
+    return [
+      state(leftElbow.sub(left.mount),across,v(0,0,1),'blade'),
+      state(elbow.sub(right.mount),upright,v(1,0,0),'blade',blade),
+    ];
+  }
+
+  punchPose(side,extended){
+    const poses=this.shield.map(copyPose);
+    for(const pose of poses)pose.shape={fist:1};
+    const index=side==='left'?0:1,sign=index?1:-1;
+    poses[index]=extended
+      ?state(v(-sign*.26,.18,-1),v(-sign*.32,.12,-1),v(0,1,0),'fist')
+      :state(v(sign*.35,-.49,-.80),v(-sign*.40,.88,-.23),v(0,0,1),'fist');
     return poses;
   }
-  discPose(aspect,release){const poses=this.neutral(aspect),scale=armScale(aspect);poses[1]=release?state(v(.12,-.25,-2.4),v(-.35,.18,-1),v(0,1,0),v(.65,-.6,1),'blade',scale,v(-.6,.05,-1)):state(v(aspect<1?.23:.55,-.25,-1.95),v(.08,1,-.05),v(0,0,1),v(.5,-.65,1),'disc',scale);return poses;}
-  reset(){this.action=null;this.entry=null;this.guard=0;this.current=this.neutral(this.camera.aspect);this.rigs.forEach((r,i)=>{r.restore();r.apply(this.current[i]);});this.updateSockets();}
+
+  discPose(release){
+    const poses=this.neutral.map(copyPose);
+    poses[1]=release
+      ?state(v(-.24,.16,-1),v(-.40,.16,-1),v(0,1,0),'blade',v(-.62,.07,-1))
+      :state(v(.35-.22*this.narrow,-.34,-.90),v(-.18-.15*this.narrow,.90,-.33),v(0,0,1),'disc');
+    return poses;
+  }
+
+  reset(){
+    this.prepareLayout();
+    this.action=null;
+    this.entry=null;
+    this.guard=0;
+    this.current=this.neutral.map(copyPose);
+    this.rigs.forEach((rig,index)=>{rig.restore();rig.apply(this.current[index]);});
+    this.updateSockets();
+  }
+
   update({beam,disc,punch,guard,dt}){
-    const aspect=this.camera.aspect,neutral=this.neutral(aspect),active=beam||disc||punch;
+    this.prepareLayout();
+    const active=beam||disc||punch;
     if(active)this.guard=0;
-    if(active!==this.action){this.action=active;this.entry=this.current.map(copyPose);}
+    if(active!==this.action){
+      this.action=active;
+      this.entry=this.current.map(copyPose);
+    }
     let target;
     if(beam){
-      const ready=this.beamPose(aspect),t=beam.age;let travel;
-      if(t<BEAM_TIMING.ready){travel=t/BEAM_TIMING.ready;target=ready.map((p,i)=>blend(this.entry[i],p,travel));}
-      else if(t<BEAM_TIMING.lightEnd)target=ready;
-      else{travel=(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd);target=ready.map((p,i)=>blend(p,neutral[i],travel));}
-      // The oblique mobile forearm first separates toward the viewer, then
-      // lowers. A direct pose blend sweeps it through the other arm on recovery.
-      if(travel!==undefined)target[0].wrist.z+=.30*clamp((1.05-aspect)/.60,0,1)*Math.sin(Math.PI*clamp(travel,0,1))**2;
+      const t=beam.age;
+      if(t<BEAM_TIMING.ready){
+        const phase=t/BEAM_TIMING.ready;
+        target=[blend(this.entry[0],this.beam[0],(phase-.15)/.85),blend(this.entry[1],this.beam[1],phase/.76)];
+      }else if(t<BEAM_TIMING.lightEnd){
+        target=this.beam;
+      }else{
+        const phase=(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd);
+        target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
+      }
+    }else if(disc){
+      const t=disc.age;
+      if(t<DISC_TIMING.ready)target=this.discHeld.map((p,i)=>blend(this.entry[i],p,t/DISC_TIMING.ready));
+      else if(t<DISC_TIMING.release)target=this.discRelease.map((p,i)=>blend(this.discHeld[i],p,(t-DISC_TIMING.ready)/(DISC_TIMING.release-DISC_TIMING.ready)));
+      else target=this.neutral.map((p,i)=>blend(this.discRelease[i],p,(t-DISC_TIMING.release)/(DISC_TIMING.end-DISC_TIMING.release)));
+    }else if(punch){
+      const chamber=this.punchPose(punch.side,false).map((pose,i)=>{
+        const gathered=blend(this.entry[i],pose,.40);
+        gathered.shape={fist:1};
+        return gathered;
+      });
+      const hit=this.punchPose(punch.side,true),t=punch.age;
+      if(t<.05)target=chamber.map((p,i)=>blend(this.entry[i],p,t/.05));
+      else if(t<.18)target=hit.map((p,i)=>blend(chamber[i],p,(t-.05)/.13));
+      else target=this.neutral.map((p,i)=>blend(hit[i],p,(t-.18)/.18));
+    }else{
+      this.guard=THREE.MathUtils.damp(this.guard,guard,12,dt);
+      target=this.shield.map((p,i)=>blend(this.neutral[i],p,this.guard));
     }
-    else if(disc){const held=this.discPose(aspect,false),release=this.discPose(aspect,true),t=disc.age;if(t<DISC_TIMING.ready)target=held.map((p,i)=>blend(this.entry[i],p,t/DISC_TIMING.ready));else if(t<DISC_TIMING.release)target=held.map((p,i)=>blend(p,release[i],(t-DISC_TIMING.ready)/(DISC_TIMING.release-DISC_TIMING.ready)));else target=release.map((p,i)=>blend(p,neutral[i],(t-DISC_TIMING.release)/(DISC_TIMING.end-DISC_TIMING.release)));}
-    else if(punch){const chamber=this.punchPose(punch.side,aspect,false),hit=this.punchPose(punch.side,aspect,true),t=punch.age;if(t<.065)target=chamber.map((p,i)=>blend(this.entry[i],p,t/.065));else if(t<.18)target=chamber.map((p,i)=>blend(p,hit[i],(t-.065)/.115));else target=hit.map((p,i)=>blend(p,neutral[i],(t-.18)/.18));}
-    else{const shield=this.shieldPose(aspect);this.guard=THREE.MathUtils.damp(this.guard,guard,16,dt);target=neutral.map((p,i)=>blend(p,shield[i],this.guard));}
-    this.current=target;this.rigs.forEach((rig,i)=>rig.apply(target[i]));this.updateSockets();return !!active||this.guard>.01;
+    this.current=target;
+    this.rigs.forEach((rig,index)=>rig.apply(target[index]));
+    this.updateSockets();
+    return !!active||this.guard>.01;
   }
+
   updateSockets(){
-    const right=this.rigs[1].metrics();this.sockets.beam.copy(right.elbow).lerp(right.wrist,.73).add(v(0,0,-.11));
-    this.sockets.disc.copy(right.wrist).addScaledVector(v(0,1,0).applyQuaternion(this.current[1].hand),this.current[1].scale).add(v(0,0,-.07));
+    const rig=this.rigs[1],right=rig.metrics();
+    this.sockets.beam.copy(right.elbow).lerp(right.wrist,.73).add(v(0,0,-.18));
+    const tip=rig.nodes.Mid3_R.localToWorld(rig.tipLocal.Mid.clone());
+    const forward=v(0,1,0).applyQuaternion(this.current[1].hand);
+    this.sockets.disc.copy(this.camera.worldToLocal(tip)).addScaledVector(forward,this.aspect<1?.28:.35).add(v(0,0,-.04));
   }
-  socketWorld(name){this.camera.updateWorldMatrix(true,false);return this.camera.localToWorld(this.sockets[name].clone());}
-  beamRail(){const right=this.rigs[1].metrics(),dir=right.wrist.clone().sub(right.elbow).normalize();return[right.elbow.clone().addScaledVector(dir,.10),right.wrist.clone().addScaledVector(dir,.40)].map(p=>this.camera.localToWorld(p.add(v(0,0,-.14))));}
+
+  socketWorld(name){return this.lens.effectPoint(this.sockets[name]);}
+  beamRail(){
+    const right=this.rigs[1].metrics(),axis=right.wrist.clone().sub(right.elbow).normalize();
+    return [right.elbow.clone().addScaledVector(axis,.14),right.wrist.clone().addScaledVector(axis,.54)].map(point=>this.lens.effectPoint(point.add(v(0,0,-.18))));
+  }
   poseHand(index,preset){const rig=this.rigs[index];rig.applyShape({[preset]:1});rig.root.updateWorldMatrix(true,true);}
   diagnostics(){return this.rigs.map(r=>{const m=r.metrics();return{side:r.side,wrist:m.wrist.toArray(),elbow:m.elbow.toArray(),shoulder:m.shoulder.toArray(),forearmLength:m.wrist.distanceTo(m.elbow),upperLength:m.elbow.distanceTo(m.shoulder),shape:r.current.shape};});}
 }

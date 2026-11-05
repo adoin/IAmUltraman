@@ -24,6 +24,11 @@ groups={g.index:g.name for g in body.vertex_groups}
 weights=[{groups[g.group]:g.weight for g in v.groups}for v in body.data.vertices]
 polygons=[(list(p.vertices),p.material_index,[tuple(body.data.uv_layers.active.data[i].uv)for i in p.loop_indices])for p in body.data.polygons]
 bones={b.name:{'head':source_rig.matrix_world@b.head_local,'tail':source_rig.matrix_world@b.tail_local}for b in source_rig.data.bones}
+eyes=bpy.data.objects['TigaEyes']
+eye_indices={index for face in eyes.data.polygons if eyes.data.materials[face.material_index].name=='EYESEMI' for index in face.vertices}
+eye_points=[eyes.matrix_world@eyes.data.vertices[index].co for index in eye_indices]
+eye_centers=[sum(side,Vector())/len(side) for side in ([p for p in eye_points if p.x<0],[p for p in eye_points if p.x>=0])]
+eye_center=(eye_centers[0]+eye_centers[1])*.5
 image=next(i for i in bpy.data.images if i.name.startswith('Tiga_body_Multi'))
 image.scale(2048,2048);image.filepath_raw=str(TEXTURES/'tiga-multi-color.jpg');image.file_format='JPEG';image.save()
 # The original flat colors were inputs to an Eevee toon shader. Calibrate those
@@ -127,6 +132,10 @@ for side,offset in [('L',-.6),('R',.6)]:
     root=bpy.data.objects.new('HeroArm'+side,None);bpy.context.collection.objects.link(root);root.location=(offset,0,0)
     root['source_author']='Extrazhang';root['source_url']='https://blendswap.com/blend/26877';root['license']='CC-BY-NC'
     root['viewmodel']='continuous mesh, 18 deform bones, five articulated fingers'
+    offset_from_eyes=(shoulder-eye_center)*size
+    # The source looks along Blender -Y. Store player-right, up, toward-player.
+    eye_mount=[-offset_from_eyes.x,offset_from_eyes.z,offset_from_eyes.y]
+    root['eye_to_shoulder']=eye_mount
     armature=bpy.data.armatures.new('Tiga first-person skeleton '+side)
     rig=bpy.data.objects.new('TigaRig'+side,armature);bpy.context.collection.objects.link(rig);rig.parent=root
     bpy.context.view_layer.objects.active=rig;rig.select_set(True);bpy.ops.object.mode_set(mode='EDIT')
@@ -146,7 +155,7 @@ for side,offset in [('L',-.6),('R',.6)]:
     root['bone_tips_space']='GLTF_Y_UP'
     arm_mesh.parent=rig
     modifier=arm_mesh.modifiers.new('Tiga skeletal skinning','ARMATURE');modifier.object=rig;modifier.use_deform_preserve_volume=False
-    metadata[side]={'vertices':len(arm_mesh.data.vertices),'polygons':len(arm_mesh.data.polygons),'bones':group_names,'normalization':size}
+    metadata[side]={'vertices':len(arm_mesh.data.vertices),'polygons':len(arm_mesh.data.polygons),'bones':group_names,'normalization':size,'eye_to_shoulder':eye_mount}
 
 # Store only the adapted meshes, FK rigs and their actual materials in the editable master.
 for block in [*bpy.data.images,*bpy.data.materials,*bpy.data.node_groups]:
