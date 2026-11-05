@@ -33,7 +33,7 @@ export class GestureRecognizer {
     const chest=(lw.y+rw.y)/2 > centerY-scale*.75 && (lw.y+rw.y)/2 < centerY+scale*1.65;
     const cross=horizontal<(easy?43:30) && vertical>(easy?47:60) && gap<(easy?.65:.4) && chest;
     const guardPose=!cross&&lw.y<ls.y+scale*.35&&rw.y<rs.y+scale*.35&&length(lw,rw)>scale*.8&&angles.every(a=>a>45);
-    if(guardPose){this.punchReady=[null,null];this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'光之护盾展开！保持举臂':'举起双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
+    if(guardPose){this.punchReady=[null,null];this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'已识别举臂防御':'举起双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
     this.guardSince=null;
     const hold=easy?420:600;
     out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,armed:this.armed.some(Boolean)};

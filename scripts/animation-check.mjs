@@ -29,10 +29,12 @@ try{
       const lens=b.hero.lens.camera;
       const project=p=>{p.project(lens);return[p.x*innerWidth/2,p.y*innerHeight/2];};
       const arms=b.hero.rigs,segments=arms.map(r=>[project(r.lower.getWorldPosition(new T.Vector3())),project(r.hand.getWorldPosition(new T.Vector3()))]);
-      const cross=b.__crossing(segments),left=arms[0];
-      const point=name=>b.camera.worldToLocal(left.nodes[name+'_L'].getWorldPosition(new T.Vector3()));
+      const cross=b.__crossing(segments),[left,right]=arms;
+      const point=name=>left.nodes[name+'_L'].getWorldPosition(new T.Vector3());
       const long=point('Mid1').sub(point('Hand')).normalize(),normal=point('Index1').sub(point('Pinky1')).normalize().cross(long).normalize();
       const forearm=point('Hand').sub(point('LowerArm')).normalize();
+      const upright=right.hand.getWorldPosition(new T.Vector3()).sub(right.lower.getWorldPosition(new T.Vector3())).normalize();
+      const finger=right.nodes.Mid3_R.localToWorld(right.tipLocal.Mid.clone()).sub(right.nodes.Mid1_R.getWorldPosition(new T.Vector3())).normalize();
       const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(lens.projectionMatrix,lens.matrixWorldInverse));
       const entries=arms.map(arm=>{
         const shoulder=arm.upper.getWorldPosition(new T.Vector3()),elbow=arm.lower.getWorldPosition(new T.Vector3());
@@ -41,7 +43,7 @@ try{
         if(first>last)return null;
         const point=shoulder.lerp(elbow,first).project(lens);return[(1+point.x)/2,(1-point.y)/2];
       });
-      const result={...cross,entries,leftPalmNormal:normal.toArray(),straightWrist:long.dot(forearm),gaps:[]};
+      const result={...cross,entries,leftPalm:normal.negate().toArray(),rightForearm:upright.toArray(),rightFingersUp:finger.y,rightElbowX:right.metrics().elbow.x,straightWrist:long.dot(forearm),gaps:[]};
       if(!cross||cross.left<=0||cross.left>=1||cross.right<=0||cross.right>=1)return result;
       const sides=new Map();b.hands.traverse(m=>{if(m.isSkinnedMesh){if(!sides.has(m.material))sides.set(m.material,m.material.side);m.material.side=T.DoubleSide;m.skeleton.update();m.computeBoundingSphere();if(m.boundingBox)m.computeBoundingBox();}});
       const ray=new T.Raycaster();
@@ -86,13 +88,13 @@ try{
   for(const [label,viewport,low]of [['desktop',{width:1280,height:800},false],['portrait',{width:390,height:844},true],['tablet',{width:700,height:900},false]]){
     await page.setViewportSize(viewport);await page.waitForTimeout(100);await act(`b.setQuality('${low?'low':'high'}');b.reduced=${low};`);
     for(const action of ['beam','punch','disc','shield']){
-      await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,drift:0,caps:0,gap:1,gapTime:0,ticks:0,previous:b.hero.rigs.map(r=>r.metrics()),mounts:b.hero.rigs.map(r=>r.metrics().shoulder),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'b.setDefense(true);':action==='punch'?'b.punch("right");':`b.cast('${action}');`}`);
-      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:[.15,.5];
+      await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,drift:0,caps:0,gap:1,gapTime:0,ticks:0,previous:b.hero.rigs.map(r=>r.metrics()),mounts:b.hero.rigs.map(r=>r.metrics().shoulder),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'':action==='punch'?'b.punch("right");':`b.cast('${action}');`}`);
+      if(action==='shield')await page.keyboard.down('l');
+      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:[.15,.5,1.95,2.6];
       let previous=0;
       for(const time of times){
         const m=await act(`
           for(let time=0;time<${time-previous}-.000001;time+=1/120){
-            ${action==='shield'?'b.setDefense(true);':''}
             b.advance(Math.min(1/120,${time-previous}-time));
             b.hero.rigs.forEach((r,i)=>{const now=r.metrics(),before=b.__motion.previous[i];
               b.__motion.drift=Math.max(b.__motion.drift,now.shoulder.distanceTo(b.__motion.mounts[i]));
@@ -112,11 +114,12 @@ try{
           }
           const rigs=b.hero.rigs,points=rigs.map(r=>r.metrics()),dirs=points.map(r=>r.wrist.clone().sub(r.elbow).normalize());
           const project=p=>{p.project(b.hero.lens.camera);return[(p.x+1)/2,(1-p.y)/2];};
+          const screenLength=(a,c,camera)=>{const delta=c.clone().project(camera).sub(a.clone().project(camera));return Math.hypot(delta.x*innerWidth,delta.y*innerHeight);};
           const fingertips=rigs.map(r=>r.nodes['Mid3_'+r.side].localToWorld(r.tipLocal.Mid.clone()));
           const beam=b.visualEffects.find(e=>e.kind==='beam'),disc=b.visualEffects.find(e=>e.kind==='disc');
           const result={time:${time},health:b.monsterHealth,visible:b.hands.visible,jump:b.__motion.jump,stretch:b.__motion.stretch,drift:b.__motion.drift,shoulderSpan:points[0].shoulder.distanceTo(points[1].shoulder),visibleCaps:b.__motion.caps,minMovingGap:b.__motion.gap,minMovingGapTime:b.__motion.gapTime,perpendicular:dirs[0].dot(dirs[1]),upright:dirs[1].y,horizontal:dirs[0].x,
             cross:${action==='beam'?'b.__inspectCross()':'null'},tips:fingertips.map(p=>project(p.clone())),wrists:rigs.map(r=>project(r.hand.getWorldPosition(new T.Vector3()))),
-            beam:beam?{visible:beam.volume.visible,sourceError:beam.start.distanceTo(b.hero.socketWorld('beam')),screenError:b.camera.localToWorld(points[1].elbow.clone().lerp(points[1].wrist,.73).add(new T.Vector3(0,0,-.18))).project(b.hero.lens.camera).distanceTo(beam.start.clone().project(b.camera)),contact:beam.contact.material.opacity,rail:beam.volume.sourceBottom.distanceTo(beam.volume.sourceTop)}:null,
+            beam:beam?{visible:beam.volume.visible,sourceError:beam.start.distanceTo(b.hero.socketWorld('beam')),screenError:b.camera.localToWorld(points[1].elbow.clone().lerp(points[1].wrist,.73).add(new T.Vector3(0,0,-.18))).project(b.hero.lens.camera).distanceTo(beam.start.clone().project(b.camera)),contact:beam.contact.material.opacity,railCoverage:screenLength(beam.volume.sourceBottom,beam.volume.sourceTop,b.camera)/screenLength(rigs[1].lower.getWorldPosition(new T.Vector3()),rigs[1].hand.getWorldPosition(new T.Vector3()),b.hero.lens.camera)}:null,
             disc:disc?{held:!disc.released,sourceError:disc.disc.position.distanceTo(b.hero.socketWorld('disc')),targetError:disc.disc.position.distanceTo(disc.end)}:null};
           b.renderer.render(b.renderScene,b.camera);return result;`);
         assert.ok(m.stretch<.0001,'action must preserve arm lengths');
@@ -129,7 +132,9 @@ try{
           if(time>=.34&&time<=1.3){
             assert.ok(m.cross.left>.2&&m.cross.left<.8&&m.cross.right>.2&&m.cross.right<.8,'crossing must lie inside BOTH forearms, not on a supporting palm');
             assert.ok(Math.abs(m.cross.angle-90)<2,'projected forearms must form a cross');
-            assert.ok(m.cross.leftPalmNormal[2]>.6&&Math.abs(m.cross.leftPalmNormal[1])<.3,'left palm must face the target, not upward');
+            assert.ok(m.cross.leftPalm[1]<-.999,'left palm must face the ground, measured from the wrist and three knuckles in world coordinates');
+            assert.ok(m.cross.rightForearm[1]>.9999&&m.cross.rightFingersUp>.98,'right wrist and blade must rise vertically above the elbow, including in side view');
+            assert.ok(m.cross.rightElbowX>(label==='desktop'?.45:.23),'right elbow must open to the player’s right');
             assert.ok(m.cross.straightWrist>.97,'left wrist must stay straight');
             assert.ok(m.cross.gaps.length>=3&&m.cross.gaps.every(g=>g>0&&g<.20),'right forearm must cover the left at the cross without penetration: '+JSON.stringify(m.cross.gaps));
             assert.ok(m.cross.entries[0]?.[0]<.28&&m.cross.entries[1]?.[0]>.70,'upper arms should enter from opposite outer portions of the frame: '+JSON.stringify(m.cross.entries));
@@ -138,10 +143,15 @@ try{
           if(time===.41){assert.equal(m.beam.visible,false);assert.equal(m.health,110);}
           if(time===.55){assert.equal(m.beam.visible,true);assert.equal(m.health,110);assert.equal(m.beam.contact,0);}
           if(time===.65){assert.equal(m.health,64);assert.ok(m.beam.contact>0);}
-          if(m.beam){assert.ok(m.beam.sourceError<.0001&&m.beam.screenError<.0001);if(time>=.55)assert.ok(m.beam.rail>.9);}
+          if(m.beam){assert.ok(m.beam.sourceError<.0001&&m.beam.screenError<.0001);if(time>=.55)assert.ok(m.beam.railCoverage>1&&m.beam.railCoverage<1.5,'the visible emitter must span the upright forearm: '+m.beam.railCoverage);}
           if(time===2.02){assert.equal(m.visible,false);assert.equal(m.beam,null);}
         }
         if(action==='punch'&&time===.18)assert.equal(m.health,98);
+        if(action==='shield'){
+          const shield=await act('return {active:b.guard,energy:b.shield.material.uniforms.energy.value};');
+          if(time<2){assert.ok(shield.active&&m.visible&&shield.energy>.2,'held shield must remain visible during its active window');}
+          else{assert.ok(!shield.active&&!m.visible&&shield.energy<.01,'shield and hands must retract on expiry while L is still held');}
+        }
         if(action==='disc'){
           if(time===.31){assert.equal(m.disc.held,true);assert.ok(m.disc.sourceError<.0001);assert.equal(m.health,110);}
           if(time===.33)assert.equal(m.disc.held,false);
@@ -157,7 +167,8 @@ try{
               await act(`const bounds=new T.Box3().setFromObject(b.hands,true),center=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
                 const halfHeight=.58*Math.max(size.y,${view==='front'?'size.x':'size.z'}/b.camera.aspect),halfWidth=halfHeight*b.camera.aspect;
                 const camera=new T.OrthographicCamera(-halfWidth,halfWidth,halfHeight,-halfHeight,.01,30),orientation=b.camera.getWorldQuaternion(new T.Quaternion());
-                camera.position.copy(center).addScaledVector(new T.Vector3(...${JSON.stringify(direction)}).applyQuaternion(orientation),6);camera.up.set(0,1,0).applyQuaternion(orientation);camera.lookAt(center);b.renderer.render(b.renderScene,camera);`);
+                const horizontal=new T.Vector3(...${JSON.stringify(direction)}).applyQuaternion(orientation).setY(0).normalize();
+                camera.position.copy(center).addScaledVector(horizontal,6);camera.up.set(0,1,0);camera.lookAt(center);b.renderer.render(b.renderScene,camera);`);
               await page.screenshot({path:path.join(artifacts,`beam-${view}.png`)});
             }
             await act('b.renderScene.background=b.__review.background;b.renderScene.fog=b.__review.fog;for(const[o,visible]of b.__review.objects)o.visible=visible;delete b.__review;');
@@ -166,6 +177,7 @@ try{
         }
         previous=time;
       }
+      if(action==='shield')await page.keyboard.up('l');
       console.log(`PASS ${label} ${action}: continuous joints, fixed arm lengths, pose framing and contact timing`);
     }
     // A camera player can cast while guarding or immediately after a punch hits.
@@ -184,6 +196,12 @@ try{
       assert.equal(transition.accepted,true);
       assert.ok(transition.gap>=0,`${label} ${previous} to beam: ${JSON.stringify(transition)}`);
       assert.ok(transition.held.left>.2&&transition.held.left<.8&&transition.held.gaps.every(g=>g>0));
+    }
+    for(const lean of [-1,1]){
+      const pose=await act(`b.start();b.nextAttack=100;b.setDefense(false,${lean});b.cast('beam');
+        for(let i=0;i<70;i++)b.advance(1/120);return b.__inspectCross();`);
+      assert.ok(pose.rightForearm[1]>.9999&&pose.leftPalm[1]<-.999,'world vertical and palm-down must survive a tilted player camera');
+      assert.ok(Math.abs(pose.angle-90)<2&&pose.left>.2&&pose.left<.8&&pose.gaps.length>=3&&pose.gaps.every(g=>g>0),'leaning must preserve the cross and the depth order: '+JSON.stringify(pose));
     }
   }
   assert.deepEqual(errors,[]);

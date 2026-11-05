@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-const MIN_VERTICAL_FOV=72;
-const MIN_HORIZONTAL_FOV=47;
+const MIN_VERTICAL_FOV=104;
+const MIN_HORIZONTAL_FOV=57;
 
 // Use a wider lens for the player's arms while keeping the city's perspective.
 // Scaling clip-space XY is exactly a change of focal length. It preserves the

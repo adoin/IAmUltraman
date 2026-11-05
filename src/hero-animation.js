@@ -58,6 +58,12 @@ class ArmRig {
     this.upperFrame=frame(this.elbow.clone().sub(this.shoulder),this.normal).invert();
     this.lowerFrame=frame(this.wrist.clone().sub(this.elbow),this.normal).invert();
     this.handFrame=frame(this.long,this.normal).invert();
+    // The bind fingers angle slightly away from the wrist-to-knuckle axis.
+    // Use the knuckle plane itself when a pose calls for an oriented palm.
+    this.palmLong=this.point(this.nodes['Mid1'+suffix]).sub(this.wrist).normalize();
+    const palmNormal=across.clone().cross(this.palmLong).normalize();
+    this.palmAcross=this.palmLong.clone().cross(palmNormal).normalize();
+    this.palmAlignment=frame(this.palmLong,palmNormal).invert().multiply(frame(this.long,this.normal));
     this.tipLocal={};
     for(const finger of [...fingers,'Thumb']){const bone=this.nodes[finger+'3'+suffix];const rootTip=this.tip(finger);this.tipLocal[finger]=bone.worldToLocal(root.localToWorld(rootTip));}
     this.fingerNodes=[...fingers,'Thumb'].flatMap(f=>[1,2,3].map(j=>this.nodes[f+j+suffix]));
@@ -92,11 +98,13 @@ class ArmRig {
     const suffix='_'+this.side;
     for(const preset of shapes){
       this.restore();const adduction={rest:.65,fist:1,blade:1,shield:.45,disc:.8}[preset];
-      const bases=fingers.map(f=>this.point(this.nodes[f+'1'+suffix])),center=bases.reduce((sum,p)=>sum+p.dot(this.across),0)/4;
+      const fingerAxis=preset==='blade'?this.palmLong:this.long;
+      const span=preset==='blade'?this.palmAcross:this.across;
+      const bases=fingers.map(f=>this.point(this.nodes[f+'1'+suffix])),center=bases.reduce((sum,p)=>sum+p.dot(span),0)/4;
       for(const [i,finger]of fingers.entries()){
         const convergence=preset==='blade'?.36:preset==='fist'?.18:0;
         const length=bases[i].distanceTo(this.tip(finger));
-        const direction=this.long.clone().addScaledVector(this.across,(center-bases[i].dot(this.across))*convergence/length).normalize();
+        const direction=fingerAxis.clone().addScaledVector(span,(center-bases[i].dot(span))*convergence/length).normalize();
         for(let joint=1;joint<=3;joint++){
           const bone=this.nodes[finger+joint+suffix];const before=bone.quaternion.clone();this.orientFinger(bone,direction);bone.quaternion.copy(before.slerp(bone.quaternion,adduction));bone.updateWorldMatrix(false,true);
         }
@@ -150,7 +158,7 @@ export class HeroAnimation {
     // The eye midpoint and shoulder span come from Tiga's rest mesh. Turn the
     // torso slightly into the stance and allow framing space in front of the
     // eyes. Each shoulder stays at its mount throughout every action.
-    const stance=THREE.MathUtils.degToRad(18);
+    const stance=THREE.MathUtils.degToRad(10);
     const vertical=Math.tan(THREE.MathUtils.degToRad(this.lens.camera.fov/2));
     const horizontal=vertical*aspect;
     let framingDepth=THREE.MathUtils.lerp(1.36,1.68,this.narrow);
@@ -168,53 +176,69 @@ export class HeroAnimation {
 
     this.neutral=[-1,1].map(sign=>state(v(sign*.74,-.64,-.20),v(sign*.62,.65,-.43),v(0,0,1),'rest'));
     this.shield=[-1,1].map(sign=>state(v(sign*.62,-.35,-.70),v(-sign*.60,.92,-.35),v(0,0,1),'shield'));
-    this.beam=this.beamPose();
+    this.beamUp=null;
+    this.syncBeamPose();
     this.discHeld=this.discPose(false);
     this.discRelease=this.discPose(true);
   }
 
-  beamPose(){
+  syncBeamPose(){
+    const worldUp=v(0,1,0).applyQuaternion(this.camera.getWorldQuaternion(q()).invert());
+    if(this.beamUp&&this.beamUp.distanceToSquared(worldUp)<1e-10)return;
+    this.beamUp=worldUp;
+    this.beam=this.beamPose(worldUp);
+  }
+
+  beamPose(up){
     const [left,right]=this.rigs;
     const mix=(wide,narrow)=>THREE.MathUtils.lerp(wide,narrow,this.narrow);
-    const x=mix(.265,.115),y=mix(-.46,-.77);
-    // Choose an open right elbow and solve its forward distance on the fixed
-    // upper-arm sphere. The forearm projects vertically through that elbow.
-    const reach=right.upperLength**2-(x-right.mount.x)**2-(y-right.mount.y)**2;
-    const elbow=v(x,y,right.mount.z-Math.sqrt(Math.max(0,reach)));
-    const pitch=mix(.98,.49);
-    const upright=v(-elbow.x/elbow.z*pitch,1,-pitch).normalize();
-    const blade=v(-elbow.x/elbow.z*.18,1,-.18);
-    const nearCross=elbow.clone().addScaledVector(upright,right.lowerLength*mix(.38,.47));
+    const side=v(1,0,0).addScaledVector(up,-up.x).normalize();
+    const forward=up.clone().cross(side).normalize();
+    const elbowHeight=mix(-.97,-.89);
+    // Keep the elbow open in the eye frame as the player leans. The wrist
+    // still follows gravity, independently of the camera's pitch and roll.
+    const lateral=(mix(.49,.245)-up.x*elbowHeight)/side.x;
+    const dx=lateral-right.mount.dot(side);
+    const dy=elbowHeight-right.mount.dot(up);
+    const reach=Math.sqrt(Math.max(0,right.upperLength**2-dx**2-dy**2));
+    const elbow=right.mount.clone().addScaledVector(side,dx).addScaledVector(up,dy).addScaledVector(forward,reach);
+    // Follow the left shoulder's change of elevation when the torso rolls.
+    const shoulderRise=(left.mount.x-right.mount.x)*up.x;
+    const nearCross=elbow.clone().addScaledVector(up,right.lowerLength*mix(.38,.53)+shoulderRise);
 
     // The horizontal forearm passes on the monster side of the right one.
     // Both centerlines project through one crossing, with room for the skin.
-    const separation=mix(.39,.44);
+    const separation=mix(.33,.41);
     const farCross=nearCross.clone().multiplyScalar(1+separation/-nearCross.z);
-    const slope=farCross.y/-farCross.z;
-    const planeNormal=v(0,1,slope).normalize();
-    const intoDepth=v(0,slope,-1).normalize();
     const offset=farCross.clone().sub(left.mount);
-    const height=offset.dot(planeNormal);
-    const planar=offset.clone().addScaledVector(planeNormal,-height);
+    // Back-project the horizontal stroke of the cross into a plane through
+    // the eye. Perspective now keeps it square to the physically upright arm.
+    const projectedUp=v(up.x-elbow.x/elbow.z*up.z,up.y-elbow.y/elbow.z*up.z).normalize();
+    const stroke=v(projectedUp.y,-projectedUp.x);
+    const plane=v(projectedUp.x,projectedUp.y,-projectedUp.dot(farCross)/farCross.z).normalize();
+    const intoDepth=plane.clone().cross(stroke).normalize();
+    const height=offset.dot(plane);
+    const planar=offset.clone().addScaledVector(plane,-height);
     const distance=planar.length();
     const radius=Math.sqrt(Math.max(0,left.upperLength**2-height**2));
-    const bearing=Math.atan2(planar.dot(intoDepth),planar.x);
-    // Intersect the chosen horizontal line with the upper arm's reach circle.
-    // Bound the bearing so the crossing remains inside the left forearm.
+    const bearing=Math.atan2(planar.dot(intoDepth),planar.dot(stroke));
+    // Select a reachable line through the crossing on the upper-arm sphere.
     const limit=Math.max(left.lowerLength*.72,distance-radius+.002);
     const tangent=Math.sqrt(Math.max(0,distance**2-radius**2));
     const halfAngle=limit<tangent
       ?Math.acos(clamp((distance**2+limit**2-radius**2)/(2*distance*limit),-1,1))
       :Math.asin(clamp(radius/distance,0,1));
-    const yaw=clamp(THREE.MathUtils.degToRad(mix(31,48)),bearing-halfAngle,bearing+halfAngle);
-    const across=v(Math.cos(yaw),0,0).addScaledVector(intoDepth,Math.sin(yaw)).normalize();
+    const yaw=clamp(THREE.MathUtils.degToRad(mix(12,36)),bearing-halfAngle,bearing+halfAngle);
+    const across=stroke.multiplyScalar(Math.cos(yaw)).addScaledVector(intoDepth,Math.sin(yaw)).normalize();
     const along=planar.dot(across);
     const toCross=along-Math.sqrt(Math.max(0,radius**2-distance**2+along**2));
     const leftElbow=farCross.clone().addScaledVector(across,-toCross);
-    return [
-      state(leftElbow.sub(left.mount),across,v(0,0,1),'blade'),
-      state(elbow.sub(right.mount),upright,v(1,0,0),'blade',blade),
-    ];
+    const handAcross=across.clone().addScaledVector(up,-across.dot(up)).normalize();
+    const horizontal=state(leftElbow.sub(left.mount),across,up,'blade',handAcross);
+    const upright=state(elbow.sub(right.mount),up,side,'blade');
+    horizontal.hand.multiply(left.palmAlignment);
+    upright.hand.multiply(right.palmAlignment);
+    return [horizontal,upright];
   }
 
   punchPose(side,extended){
@@ -255,6 +279,7 @@ export class HeroAnimation {
     }
     let target;
     if(beam){
+      this.syncBeamPose();
       const t=beam.age;
       if(t<BEAM_TIMING.ready){
         const phase=t/BEAM_TIMING.ready;
