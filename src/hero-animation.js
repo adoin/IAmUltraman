@@ -6,7 +6,7 @@ const q=()=>new THREE.Quaternion();
 const clamp=THREE.MathUtils.clamp;
 const ease=t=>{t=clamp(t,0,1);return t*t*t*(t*(t*6-15)+10);};
 const fingers=['Index','Mid','Ring','Pinky'];
-const shapes=['rest','fist','blade','support','shield','disc'];
+const shapes=['rest','fist','blade','shield','disc'];
 const armScale=aspect=>aspect<1?.62:.68;
 
 function frame(forward,normal){
@@ -62,8 +62,7 @@ class ArmRig {
     // toward the PALM (-normal), never over the back of the hand. Authoring all three
     // segments also prevents the hooked thumb produced by an unconstrained tip IK.
     const directions={
-      blade:[[.32,.88,-.22],[-.25,.86,-.24],[-.52,.74,.18]],
-      support:[[.32,.88,-.22],[-.25,.86,-.24],[-.52,.74,.18]],
+      blade:[[.32,.88,-.10],[-.25,.86,-.10],[-.52,.74,.14]],
       fist:[[.18,.55,-.8],[-.8,.5,-.3],[-.95,.2,0]],
       rest:[[.4,.8,-.25],[-.3,.8,-.4],[-.65,.5,-.15]],
       disc:[[.4,.75,-.35],[-.5,.65,-.5],[-.85,.3,-.05]],
@@ -76,17 +75,17 @@ class ArmRig {
     // Explicit finger adduction is separate from flexion. Zero curl is not a blade hand.
     const suffix='_'+this.side;
     for(const preset of shapes){
-      this.restore();const adduction={rest:.65,fist:1,blade:1,support:1,shield:.45,disc:.8}[preset];
+      this.restore();const adduction={rest:.65,fist:1,blade:1,shield:.45,disc:.8}[preset];
       const bases=fingers.map(f=>this.point(this.nodes[f+'1'+suffix])),center=bases.reduce((sum,p)=>sum+p.dot(this.across),0)/4;
       for(const [i,finger]of fingers.entries()){
-        const convergence=preset==='blade'||preset==='support'?.36:preset==='fist'?.18:0;
+        const convergence=preset==='blade'?.36:preset==='fist'?.18:0;
         const length=bases[i].distanceTo(this.tip(finger));
         const direction=this.long.clone().addScaledVector(this.across,(center-bases[i].dot(this.across))*convergence/length).normalize();
         for(let joint=1;joint<=3;joint++){
           const bone=this.nodes[finger+joint+suffix];const before=bone.quaternion.clone();this.orientFinger(bone,direction);bone.quaternion.copy(before.slerp(bone.quaternion,adduction));bone.updateWorldMatrix(false,true);
         }
       }
-      const curl={rest:[.35,.5,.28],fist:[1.15,1.45,1.0],blade:[.015,.015,.015],support:[.1,.12,.08],shield:[.035,.06,.025],disc:[.5,.65,.38]}[preset];
+      const curl={rest:[.35,.5,.28],fist:[1.15,1.45,1.0],blade:[.015,.015,.015],shield:[.035,.06,.025],disc:[.5,.65,.38]}[preset];
       for(const finger of fingers)for(let joint=1;joint<=3;joint++){
         const bone=this.nodes[finger+joint+suffix];const axis=this.normal.clone().cross(this.long).normalize();
         const worldAxis=axis.applyQuaternion(this.root.getWorldQuaternion(q()));const parentInv=bone.parent.getWorldQuaternion(q()).invert();
@@ -121,13 +120,22 @@ export class HeroAnimation {
     const scale=armScale(aspect);
     // A taller camera frustum needs a lower elbow so the shoulder cut stays below
     // the image. Merely squeezing both arms sideways exposes the cut on phones.
-    const wristY=.05-(Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))-Math.tan(THREE.MathUtils.degToRad(57/2)))*2.4+(scale-.68)*1.3;
+    const wristY=-.07-(Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))-Math.tan(THREE.MathUtils.degToRad(57/2)))*2.4+(scale-.68)*1.3;
     const rightWrist=v(aspect<1?.12:.16,wristY,-2.35);
     const right=state(rightWrist,v(0,1,0),v(1,0,0),v(.7,-.9,.55),'blade',scale);
     const elbow=rightWrist.clone().add(v(0,-this.rigs[1].lowerLength*scale,0));
-    // Left palm supports the vertical arm at the elbow. The depth offset avoids mesh intersection.
-    const leftWrist=elbow.clone().add(v(-.65*scale,-.20*scale,.055));
-    const left=state(leftWrist,v(1,0,0),v(0,-1,0),v(-.15,-.8,.65),'support',scale);
+    // The FOREARMS cross: the left forearm passes in front of the right one,
+    // with the crossing inside both elbow-to-wrist segments. Both hands are
+    // straight blades; the left palm faces the target instead of cupping upward.
+    const depth=-2.07,ratio=depth/rightWrist.z;
+    const crossing=elbow.clone().lerp(rightWrist,.43);
+    const crossPoint=v(crossing.x*ratio,crossing.y*ratio,depth);
+    // On narrow screens turn the entire left forearm into depth, keeping the
+    // wrist straight and its projected elbow-to-wrist line horizontal.
+    const yaw=clamp((1.05-aspect)/.60,0,1)*Math.PI/4;
+    const leftDirection=v(Math.cos(yaw),-Math.sin(yaw)*crossPoint.y/crossPoint.z,-Math.sin(yaw)).normalize();
+    const leftWrist=crossPoint.clone().addScaledVector(leftDirection,this.rigs[0].lowerLength*scale*.5);
+    const left=state(leftWrist,leftDirection,v(0,0,1),v(-.12,-1,Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))),'blade',scale);
     return[left,right];
   }
   shieldPose(aspect){const x=aspect<1?.20:.48;return[-1,1].map(side=>state(v(side*x,-.23,-1.55),v(side*.05,1,-.12),v(0,0,1),v(side*.5,-.2,1),'shield',armScale(aspect)));}
@@ -142,7 +150,15 @@ export class HeroAnimation {
     if(active)this.guard=0;
     if(active!==this.action){this.action=active;this.entry=this.current.map(copyPose);}
     let target;
-    if(beam){const ready=this.beamPose(aspect),t=beam.age;if(t<BEAM_TIMING.ready)target=ready.map((p,i)=>blend(this.entry[i],p,t/BEAM_TIMING.ready));else if(t<BEAM_TIMING.lightEnd)target=ready;else target=ready.map((p,i)=>blend(p,neutral[i],(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd)));}
+    if(beam){
+      const ready=this.beamPose(aspect),t=beam.age;let travel;
+      if(t<BEAM_TIMING.ready){travel=t/BEAM_TIMING.ready;target=ready.map((p,i)=>blend(this.entry[i],p,travel));}
+      else if(t<BEAM_TIMING.lightEnd)target=ready;
+      else{travel=(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd);target=ready.map((p,i)=>blend(p,neutral[i],travel));}
+      // The oblique mobile forearm first separates toward the viewer, then
+      // lowers. A direct pose blend sweeps it through the other arm on recovery.
+      if(travel!==undefined)target[0].wrist.z+=.30*clamp((1.05-aspect)/.60,0,1)*Math.sin(Math.PI*clamp(travel,0,1))**2;
+    }
     else if(disc){const held=this.discPose(aspect,false),release=this.discPose(aspect,true),t=disc.age;if(t<DISC_TIMING.ready)target=held.map((p,i)=>blend(this.entry[i],p,t/DISC_TIMING.ready));else if(t<DISC_TIMING.release)target=held.map((p,i)=>blend(p,release[i],(t-DISC_TIMING.ready)/(DISC_TIMING.release-DISC_TIMING.ready)));else target=release.map((p,i)=>blend(p,neutral[i],(t-DISC_TIMING.release)/(DISC_TIMING.end-DISC_TIMING.release)));}
     else if(punch){const chamber=this.punchPose(punch.side,aspect,false),hit=this.punchPose(punch.side,aspect,true),t=punch.age;if(t<.065)target=chamber.map((p,i)=>blend(this.entry[i],p,t/.065));else if(t<.18)target=chamber.map((p,i)=>blend(p,hit[i],(t-.065)/.115));else target=hit.map((p,i)=>blend(p,neutral[i],(t-.18)/.18));}
     else{const shield=this.shieldPose(aspect);this.guard=THREE.MathUtils.damp(this.guard,guard,16,dt);target=neutral.map((p,i)=>blend(p,shield[i],this.guard));}

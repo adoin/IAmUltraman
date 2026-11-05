@@ -16,6 +16,38 @@ try{
   await page.locator('#start-keyboard').click();
   const act=code=>page.evaluate(async code=>{const{battle:b}=await import(document.querySelector('script[type=module]').src);const T=await import('three');return new Function('b','T',code)(b,T);},code);
   await act('b.renderer.setAnimationLoop(null);');
+  await act(`
+    b.__crossing=segments=>{
+      const [[a,c],[d,f]]=segments,sub=(a,b)=>[a[0]-b[0],a[1]-b[1]],cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+      const r=sub(c,a),s=sub(f,d),offset=sub(d,a),den=cross(r,s);
+      if(Math.abs(den)<.000001)return null;
+      const left=cross(offset,s)/den,right=cross(offset,r)/den;
+      return{left,right,point:[a[0]+left*r[0],a[1]+left*r[1]],angle:Math.acos(Math.max(-1,Math.min(1,(r[0]*s[0]+r[1]*s[1])/Math.hypot(...r)/Math.hypot(...s))))*180/Math.PI};
+    };
+    b.__inspectCross=(allSamples=true)=>{
+      b.renderScene.updateMatrixWorld(true);
+      const project=p=>{p.project(b.camera);return[p.x*innerWidth/2,p.y*innerHeight/2];};
+      const arms=b.hero.rigs,segments=arms.map(r=>[project(r.lower.getWorldPosition(new T.Vector3())),project(r.hand.getWorldPosition(new T.Vector3()))]);
+      const cross=b.__crossing(segments),left=arms[0];
+      const point=name=>b.camera.worldToLocal(left.nodes[name+'_L'].getWorldPosition(new T.Vector3()));
+      const long=point('Mid1').sub(point('Hand')).normalize(),normal=point('Index1').sub(point('Pinky1')).normalize().cross(long).normalize();
+      const forearm=point('Hand').sub(point('LowerArm')).normalize();
+      const result={...cross,leftPalmNormal:normal.toArray(),straightWrist:long.dot(forearm),gaps:[]};
+      if(!cross||cross.left<=0||cross.left>=1||cross.right<=0||cross.right>=1)return result;
+      const sides=new Map();b.hands.traverse(m=>{if(m.isSkinnedMesh){if(!sides.has(m.material))sides.set(m.material,m.material.side);m.material.side=T.DoubleSide;m.skeleton.update();m.computeBoundingSphere();if(m.boundingBox)m.computeBoundingBox();}});
+      const ray=new T.Raycaster();
+      for(const [dx,dy]of (allSamples?[[0,0],[-.006,0],[.006,0],[0,-.006],[0,.006]]:[[0,0]])){
+        ray.setFromCamera(new T.Vector2(cross.point[0]*2/innerWidth+dx,cross.point[1]*2/innerHeight+dy),b.camera);
+        const hits=arms.map(r=>ray.intersectObject(r.root,true).map(h=>h.distance));
+        if(hits.every(h=>h.length>=2))result.gaps.push(Math.min(...hits[1])-Math.max(...hits[0]));
+      }
+      for(const [material,side]of sides)material.side=side;
+      return result;
+    };
+  `);
+  // The previously shipped tray pose was perpendicular but did not intersect.
+  const rejected=await act('return b.__crossing([[[-1.063,-.867],[-.282,-.867]],[[.16,-.731],[.16,.05]]]);');
+  assert.ok(!(rejected.left>.2&&rejected.left<.8&&rejected.right>.2&&rejected.right<.8),'old elbow-support pose must fail the cross criterion');
 
   // Measure the deformed skeleton, not just preset names or assigned quaternions.
   const hands=await act(`
@@ -45,8 +77,8 @@ try{
   for(const [label,viewport,low]of [['desktop',{width:1280,height:800},false],['portrait',{width:390,height:844},true],['tablet',{width:700,height:900},false]]){
     await page.setViewportSize(viewport);await page.waitForTimeout(100);await act(`b.setQuality('${low?'low':'high'}');b.reduced=${low};`);
     for(const action of ['beam','punch','disc','shield']){
-      await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,caps:0,previous:b.hero.rigs.map(r=>r.metrics()),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'b.setDefense(true);':action==='punch'?'b.punch("right");':`b.cast('${action}');`}`);
-      const times=action==='beam'?[.16,.34,.41,.55,.65,1.3,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:[.15,.5];
+      await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,caps:0,gap:1,gapTime:0,ticks:0,previous:b.hero.rigs.map(r=>r.metrics()),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'b.setDefense(true);':action==='punch'?'b.punch("right");':`b.cast('${action}');`}`);
+      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:[.15,.5];
       let previous=0;
       for(const time of times){
         const m=await act(`
@@ -64,13 +96,16 @@ try{
               const p=mesh.getVertexPosition(i,new T.Vector3()).applyMatrix4(mesh.matrixWorld).project(b.camera);
               if(Math.abs(p.x)<1&&Math.abs(p.y)<1&&p.z>-1&&p.z<1)b.__motion.caps++;
             }}
+            if('${action}'==='beam'&&++b.__motion.ticks%2===0){const age=b.effects.find(e=>e.kind==='beam')?.age;if(age!==undefined&&(age<.32||age>1.62)){
+              const cross=b.__inspectCross(false);if(cross.gaps.length){const gap=Math.min(...cross.gaps);if(gap<b.__motion.gap){b.__motion.gap=gap;b.__motion.gapTime=age;}}
+            }}
           }
           const rigs=b.hero.rigs,points=rigs.map(r=>r.metrics()),dirs=points.map(r=>r.wrist.clone().sub(r.elbow).normalize());
           const project=p=>{p.project(b.camera);return[(p.x+1)/2,(1-p.y)/2];};
           const fingertips=rigs.map(r=>r.nodes['Mid3_'+r.side].localToWorld(r.tipLocal.Mid.clone()));
           const beam=b.visualEffects.find(e=>e.kind==='beam'),disc=b.visualEffects.find(e=>e.kind==='disc');
-          const result={time:${time},health:b.monsterHealth,visible:b.hands.visible,jump:b.__motion.jump,stretch:b.__motion.stretch,visibleCaps:b.__motion.caps,perpendicular:dirs[0].dot(dirs[1]),upright:dirs[1].y,horizontal:dirs[0].x,
-            supportGap:points[1].elbow.distanceTo(b.camera.worldToLocal(fingertips[0].clone())),tips:fingertips.map(p=>project(p.clone())),wrists:rigs.map(r=>project(r.hand.getWorldPosition(new T.Vector3()))),
+          const result={time:${time},health:b.monsterHealth,visible:b.hands.visible,jump:b.__motion.jump,stretch:b.__motion.stretch,visibleCaps:b.__motion.caps,minMovingGap:b.__motion.gap,minMovingGapTime:b.__motion.gapTime,perpendicular:dirs[0].dot(dirs[1]),upright:dirs[1].y,horizontal:dirs[0].x,
+            cross:${action==='beam'?'b.__inspectCross()':'null'},tips:fingertips.map(p=>project(p.clone())),wrists:rigs.map(r=>project(r.hand.getWorldPosition(new T.Vector3()))),
             beam:beam?{visible:beam.volume.visible,sourceError:beam.start.distanceTo(b.hero.socketWorld('beam')),contact:beam.contact.material.opacity,rail:beam.volume.sourceBottom.distanceTo(beam.volume.sourceTop)}:null,
             disc:disc?{held:!disc.released,sourceError:disc.disc.position.distanceTo(b.hero.socketWorld('disc')),targetError:disc.disc.position.distanceTo(disc.end)}:null};
           b.renderer.render(b.renderScene,b.camera);return result;`);
@@ -79,9 +114,13 @@ try{
         assert.ok(m.jump<(action==='punch'?.42:.24),'adjacent frames must not teleport joints');
         assert.equal((await page.locator('body').innerText()).trim(),'');
         if(action==='beam'){
+          assert.ok(m.minMovingGap>=0,'forearms must not pass through each other during entry/recovery: '+JSON.stringify({viewport:label,gap:m.minMovingGap,time:m.minMovingGapTime}));
           if(time>=.34&&time<=1.3){
-            assert.ok(Math.abs(m.perpendicular)<.025&&m.upright>.99&&m.horizontal>.99,'hold must form a vertical blade and horizontal support');
-            assert.ok(m.supportGap<.23,'supporting fingers must meet the vertical elbow');
+            assert.ok(m.cross.left>.2&&m.cross.left<.8&&m.cross.right>.2&&m.cross.right<.8,'crossing must lie inside BOTH forearms, not on a supporting palm');
+            assert.ok(Math.abs(m.cross.angle-90)<2,'projected forearms must form a cross');
+            assert.ok(m.cross.leftPalmNormal[2]>.6&&Math.abs(m.cross.leftPalmNormal[1])<.3,'left palm must face the target, not upward');
+            assert.ok(m.cross.straightWrist>.97,'left wrist must stay straight');
+            assert.ok(m.cross.gaps.length>=3&&m.cross.gaps.every(g=>g>0&&g<.20),'left forearm must sit immediately in front, without penetrating the right arm: '+JSON.stringify(m.cross.gaps));
             for(const [x,y]of [...m.tips,...m.wrists])assert.ok(x>.03&&x<.97&&y>.03&&y<.94,'hands must fit in the viewport');
           }
           if(time===.41){assert.equal(m.beam.visible,false);assert.equal(m.health,110);}
@@ -98,7 +137,18 @@ try{
         }
         report.push({viewport:label,action,...m});
         await page.screenshot({path:path.join(artifacts,`${label}-${action}-${time}.png`)});
-        if(action==='beam'&&time===.34){await act('b.visualEffects.forEach(e=>e.group.visible=false);b.renderer.render(b.renderScene,b.camera);');await page.screenshot({path:path.join(artifacts,`${label}-beam-pose.png`)});await act('b.visualEffects.forEach(e=>e.group.visible=true);');}
+        if(action==='beam'&&time===.34){
+          await act('b.visualEffects.forEach(e=>e.group.visible=false);b.renderer.render(b.renderScene,b.camera);');await page.screenshot({path:path.join(artifacts,`${label}-beam-pose.png`)});
+          if(label==='desktop'){
+            await act('b.__review={background:b.renderScene.background,fog:b.renderScene.fog,objects:b.renderScene.children.map(o=>[o,o.visible])};b.renderScene.children.forEach(o=>{if(o!==b.camera&&!o.isLight)o.visible=false;});b.renderScene.background=new T.Color(0x242b35);b.renderScene.fog=null;');
+            for(const [view,position]of [['front',[0,-.55,-6]],['side',[4,-.55,-2.2]]]){
+              await act(`const camera=new T.OrthographicCamera(-1.6,1.6,1,-1,.01,30);camera.position.copy(b.camera.localToWorld(new T.Vector3(...${JSON.stringify(position)})));camera.up.set(0,1,0).applyQuaternion(b.camera.getWorldQuaternion(new T.Quaternion()));camera.lookAt(b.camera.localToWorld(new T.Vector3(0,-.55,-2.2)));b.renderer.render(b.renderScene,camera);`);
+              await page.screenshot({path:path.join(artifacts,`beam-${view}.png`)});
+            }
+            await act('b.renderScene.background=b.__review.background;b.renderScene.fog=b.__review.fog;for(const[o,visible]of b.__review.objects)o.visible=visible;delete b.__review;');
+          }
+          await act('b.visualEffects.forEach(e=>e.group.visible=true);');
+        }
         previous=time;
       }
       console.log(`PASS ${label} ${action}: continuous joints, fixed arm lengths, pose framing and contact timing`);
