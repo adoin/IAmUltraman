@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101a24">
+  <title>迪迦 · 直拳动作对照</title>
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <style>
+    * { box-sizing: border-box }
+    body { margin: 0; min-height: 100vh; background: #101a24; color: #f1f5f8; font: 16px system-ui,sans-serif }
+    main { width: min(1400px,96vw); margin: auto; padding: 24px 0 }
+    header, .controls { display: flex; align-items: center; gap: 16px }
+    header { justify-content: space-between; margin-bottom: 16px }
+    h1 { font-size: clamp(1.15rem,3vw,1.7rem); margin: 0 }
+    a { color: #a6e6ef; text-underline-offset: 3px }
+    .stage { position: relative; aspect-ratio: 2.7; overflow: hidden; border: 1px solid #455767; border-radius: 12px; background: #263443 }
+    canvas { position: absolute; display: block; width: 100%; height: 100% }
+    .view { position: absolute; top: 12px; left: 12px; padding: 4px 9px; border-radius: 5px; background: #101a24d9; color: white; font-size: .85rem; pointer-events: none }
+    .eye { left: calc(50% + 12px) }
+    #status { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; margin: 0; background: #182532 }
+    #status[hidden] { display: none }
+    .controls { margin: 15px 0; flex-wrap: wrap }
+    button { background: #b9f3ed; color: #12242c; font: inherit; border: 0; border-radius: 7px; padding: 7px 19px; cursor: pointer; min-width: 5rem }
+    #seek { flex: 1 1 120px; min-width: 0; accent-color: #a4f2e9 }
+    label { white-space: nowrap }
+    #stamp { font-variant-numeric: tabular-nums; color: #c7d7e1 }
+    footer { color: #aebfc9; font-size: .85rem; line-height: 1.7 }
+    @media(max-width:700px) { main { padding: 14px 0 } .stage { aspect-ratio: .69 } .eye { left: 12px; top: calc(50% + 12px) } .controls { gap: 10px } }
+  </style>
+  <script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+</head>
+<body><main>
+  <header><h1>迪迦 · 直拳动作对照</h1><a href="../../">进入游戏</a></header>
+  <div class="stage"><canvas id="scene" aria-label="同一段直拳动作的全身与第一人称对照"></canvas><span class="view">全身视角</span><span class="view eye">双眼视角</span><p id="status" role="status">正在加载动作…</p></div>
+  <div class="controls"><button id="play" type="button" disabled>播放</button><input id="seek" type="range" min="0" max="1000" value="0" aria-label="动作进度" disabled><output id="stamp">0.00 s</output><label><input id="slow" type="checkbox" checked> 慢放</label></div>
+  <footer>模型来自 <a href="https://blendswap.com/blend/26877" target="_blank" rel="noopener">Extrazhang · Ultraman Tiga</a>（CC BY-NC）。动作来自 <a href="https://quaternius.com/packs/universalanimationlibrary.html" target="_blank" rel="noopener">Quaternius · Universal Animation Library</a>（CC0），已适配迪迦骨架。</footer>
+</main><script type="module" src="./viewer.js"></script></body></html>

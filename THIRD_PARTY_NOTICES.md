@@ -10,6 +10,10 @@ The game uses a first-person derivative of the continuous arm mesh. Each arm ret
 
 The on-screen **制作与鸣谢** presents this attribution and modification notice. This is community fan art, with no official affiliation asserted.
 
+## Full-body motion preview
+
+The independent punch preview uses **Punch_Cross** by **Quaternius**, from [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html), licensed under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The motion is retargeted to the Extrazhang Tiga derivative above. Adaptations include wrist and foot placement for the different body proportions, a first-person head mask and a camera at the source eye midpoint. The combined character asset is distributed for this noncommercial game. Both source credits appear on the preview page.
+
 ## Three.js
 
 Three.js 0.180.0, copyright 2010-2025 three.js authors. MIT license, full text in public/vendor/three/LICENSE. Runtime modules and GLTFLoader are copied from the pinned npm package by scripts/build.mjs.

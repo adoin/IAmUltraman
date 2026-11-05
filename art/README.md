@@ -59,3 +59,15 @@
 怪兽配色以 sRGB 十六进制定义，在建模脚本中明确转换到线性空间后写入 Principled BSDF，再由 glTF / Three.js 按线性材质加载。手部既有线性色值单独保留。场景使用中性补光，常驻青色核心灯在待机时关闭，蓄力/命中时才增强；皮肤与装甲采用高粗糙度、低金属度，避免塑料感和青白过曝。
 
 `art/kaiju_shapes.py` 提供连续截面与装甲几何；`npm run test:models` 在实际浏览器验证三种材质颜色、腰胸比、模型枢轴、面数及手机画幅。构建版本包含 GLB 文件内容哈希，模型 URL 带同一版本参数，避免旧模型被浏览器缓存。
+
+## 外部全身动作试片
+
+`import_body_motion.py` 使用 Extrazhang 原模型的连续身体、UV 和蒙皮权重，按原骨骼位置建立 52 根身体与手指骨骼。它在两个角色的静止姿势之间校准骨轴和掌面，将 Quaternius 的身体旋转逐帧转给迪迦，并按目标臂长校正腕部和落脚。`EyeAnchor` 位于原模型双眼的中心，随头骨移动。网页共用一个 AnimationMixer，双眼视图隐藏头部表面并看向怪兽。
+
+输入为 [Quaternius Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) 免费 Standard 版中的 `Unreal-Godot/UAL1_Standard.glb`。已核验包内 CC0 声明。ZIP 的 SHA-256 为 `cc73fc4e495b82958207316596317a3f40b9fa38065bde1027937452da537724`，输入 GLB 的 SHA-256 为 `69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997`。
+
+```powershell
+& 'D:/software/Blender/blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 1 --python art/import_body_motion.py -- --library 'PATH/UAL1_Standard.glb' --clip Punch_Cross
+```
+
+生成文件 `public/motion-preview/tiga-punch.glb` 包括完整角色、`Punch_Cross` 动作和眼位镜头。正常游戏和试片有各自的加载入口。导入其他骨架时需要核对其初始姿势、骨骼对应关系和素材许可。
