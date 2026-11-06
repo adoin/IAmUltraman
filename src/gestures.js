@@ -7,12 +7,16 @@ function segmentDistance(p,a,b) {
   const t=d ? clamp(((p.x-a.x)*x+(p.y-a.y)*y)/d,0,1) : 0;
   return Math.hypot(p.x-a.x-t*x,p.y-a.y-t*y);
 }
+function segmentsCross(a,b,c,d){
+  const side=(p,q,r)=>(q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);
+  return side(a,b,c)*side(a,b,d)<=0&&side(c,d,a)*side(c,d,b)<=0;
+}
 /** Geometry uses image pixels (not normalized x/y) to preserve angles at any aspect ratio. */
 export class GestureRecognizer {
   constructor(){this.mode='easy';this.reset();}
-  reset(){this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];}
+  reset(){this.palmSince=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];}
   update(points,time,width=640,height=480){
-    const out={skill:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；十字发光线，举手挥出光轮',tracking:false,debug:{}};
+    const out={skill:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；十字发光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,debug:{}};
     if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>900)) this.reset();
     this.lastTime=time;
     if(!points) return this.lost(out);
@@ -32,19 +36,28 @@ export class GestureRecognizer {
     const centerY=(ls.y+rs.y)/2;
     const chest=(lw.y+rw.y)/2 > centerY-scale*.75 && (lw.y+rw.y)/2 < centerY+scale*1.65;
     const cross=horizontal<(easy?43:30) && vertical>(easy?47:60) && gap<(easy?.65:.4) && chest;
-    const guardPose=!cross&&lw.y<ls.y+scale*.35&&rw.y<rs.y+scale*.35&&length(lw,rw)>scale*.8&&angles.every(a=>a>45);
-    if(guardPose){this.punchReady=[null,null];this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'已识别举臂防御':'举起双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
+    const crossedWrists=(lw.x-rw.x)*(ls.x-rs.x)<0;
+    const guardPose=crossedWrists&&chest&&angles.every(a=>a>25&&a<78)&&segmentsCross(le,lw,re,rw);
+    if(guardPose){this.palmSince=null;this.palmFired=false;this.punchReady=[null,null];this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'已识别举臂防御':'胸前交叉双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
     this.guardSince=null;
+    const extended=[elbowAngle(ls,le,lw),elbowAngle(rs,re,rw)];
+    const palmPose=!cross&&[[ls,lw,rs,rw],[rs,rw,ls,lw]].some(([s,w,other,rest],i)=>extended[i]>150&&Math.abs(w.y-s.y)<scale*.3&&rest.y>other.y+scale*.5&&(s.z-w.z>scale*.15||length(s,w)>scale*.9));
+    if(palmPose){
+      this.palmSince??=time;
+      this.raise=[null,null];this.armed=[null,null];
+      out.charge=clamp((time-this.palmSince)/650,0,1);out.status='单掌前推，保持片刻…';
+      if(time-this.palmSince>=650&&!this.palmFired){out.skill='palm';out.status='手掌光箭！收回手臂再来一次';this.palmFired=true;this.punchReady=[null,null];return out;}
+    }else{this.palmSince=null;this.palmFired=false;}
     const hold=easy?420:600;
     out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,armed:this.armed.some(Boolean)};
-    if(cross){
+    if(cross&&!guardPose){
       this.crossSince??=time;
       out.charge=clamp((time-this.crossSince)/hold,0,1);out.status='保持十字姿势，凝聚光线…';
       if(out.charge>=1&&!this.crossFired){out.skill='beam';this.crossFired=true;this.raise=[null,null];this.armed=[null,null];}
       if(this.crossFired)out.status='光线发射！放下双手，再来一次';
     }else{this.crossSince=null;this.crossFired=false;}
     for(let side=0;side<2;side++){
-      if(cross)continue;
+      if(cross||guardPose||palmPose)continue;
       const wrist=side===0?lw:rw,shoulder=side===0?ls:rs;
       if(this.armed[side]){
         const armed=this.armed[side];
@@ -65,14 +78,14 @@ export class GestureRecognizer {
     for(let side=0;side<2;side++){
       const [shoulder,elbow,wrist]=side===0?[ls,le,lw]:[rs,re,rw];const angle=elbowAngle(shoulder,elbow,wrist);
       const chestHeight=wrist.y>shoulder.y-scale*.35&&wrist.y<shoulder.y+scale*.9;
-      if(angle<112&&chestHeight)this.punchReady[side]={time,wrist:{...wrist},angle};
+      if(angle<135&&chestHeight&&!this.punchReady[side])this.punchReady[side]={time,wrist:{...wrist},angle};
       const ready=this.punchReady[side];if(!ready)continue;
-      if(time-ready.time>850||!chestHeight){this.punchReady[side]=null;continue;}
+      if(time-ready.time>1200||!chestHeight){this.punchReady[side]=null;continue;}
       const travel=Math.hypot(wrist.x-ready.wrist.x,wrist.y-ready.wrist.y,wrist.z-ready.wrist.z)/scale;
       const forward=(ready.wrist.z-wrist.z)/scale;
-      if(angle>145&&angle-ready.angle>35&&travel>.35&&(forward>.18||travel>.65)){out.punch=side===0?'left':'right';out.status='向前出拳！收回手臂，再出下一拳';this.punchReady[side]=null;break;}
+      if(angle>130&&angle-ready.angle>20&&travel>.22&&(forward>.10||travel>.38)){out.punch=side===0?'left':'right';out.status='向前出拳！收回手臂，再出下一拳';this.punchReady[side]=null;break;}
     }
     return out;
   }
-  lost(out){this.punchReady=[null,null];this.crossSince=null;this.crossFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
+  lost(out){this.palmSince=null;this.palmFired=false;this.punchReady=[null,null];this.crossSince=null;this.crossFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
 }

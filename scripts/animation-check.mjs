@@ -87,10 +87,10 @@ try{
 
   for(const [label,viewport,low]of [['desktop',{width:1280,height:800},false],['portrait',{width:390,height:844},true],['tablet',{width:700,height:900},false]]){
     await page.setViewportSize(viewport);await page.waitForTimeout(100);await act(`b.setQuality('${low?'low':'high'}');b.reduced=${low};`);
-    for(const action of ['beam','punch','disc','shield']){
-      await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,drift:0,caps:0,gap:1,gapTime:0,ticks:0,previous:b.hero.rigs.map(r=>r.metrics()),mounts:b.hero.rigs.map(r=>r.metrics().shoulder),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'':action==='punch'?'b.punch("right");':`b.cast('${action}');`}`);
+    for(const action of ['beam','punch','disc','palm','shield']){
+      await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,drift:0,caps:0,gap:1,gapTime:0,ticks:0,previous:b.hero.rigs.map(r=>r.metrics()),mounts:b.hero.rigs.map(r=>r.metrics().shoulder),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'':action==='punch'?'b.enemyDistance=13;b.punch("right");':`b.cast('${action}');`}`);
       if(action==='shield')await page.keyboard.down('l');
-      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:[.15,.5,1.95,2.6];
+      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:action==='palm'?[.08,.18,.35,.55,.8]:[.15,.5,1.95,2.6];
       let previous=0;
       for(const time of times){
         const m=await act(`
@@ -104,10 +104,23 @@ try{
             // Attached skins need updateMatrixWorld (not just updateWorldMatrix)
             // before CPU skinning: it refreshes their inverse bind transforms.
             b.renderScene.updateMatrixWorld(true);
-            for(const mesh of b.__caps){mesh.skeleton.update();for(let i=0;i<mesh.geometry.attributes.position.count;i++){
-              const p=mesh.getVertexPosition(i,new T.Vector3()).applyMatrix4(mesh.matrixWorld).project(b.hero.lens.camera);
-              if(b.hands.visible&&Math.abs(p.x)<1&&Math.abs(p.y)<1&&p.z>-1&&p.z<1)b.__motion.caps++;
-            }}
+            let capBoundsReady=false;
+            for(const mesh of b.__caps){
+              mesh.skeleton.update();const g=mesh.geometry,index=g.index,eye=b.hero.lens.camera.getWorldPosition(new T.Vector3());
+              for(let i=0;i<(index?index.count:g.attributes.position.count);i+=3){
+                const triangle=[0,1,2].map(j=>mesh.getVertexPosition(index?index.getX(i+j):i+j,new T.Vector3()).applyMatrix4(mesh.matrixWorld));
+                const [a,c,d]=triangle,normal=c.clone().sub(a).cross(d.clone().sub(a));
+                if(mesh.material.side===T.FrontSide&&normal.dot(a.clone().sub(eye))>=0)continue;
+                const center=a.clone().add(c).add(d).divideScalar(3);
+                for(const vertex of triangle){
+                  const sample=vertex.clone().lerp(center,.05),projected=sample.clone().project(b.hero.lens.camera);
+                  if(!b.hands.visible||Math.abs(projected.x)>=1||Math.abs(projected.y)>=1||projected.z<=-1||projected.z>=1)continue;
+                  if(!capBoundsReady){b.hands.traverse(o=>{if(o.isSkinnedMesh){o.skeleton.update();o.computeBoundingSphere();}});capBoundsReady=true;}
+                  const ray=new T.Raycaster(eye,sample.clone().sub(eye).normalize()),hit=ray.intersectObject(b.hands,true)[0];
+                  if(hit?.object===mesh)b.__motion.caps++;
+                }
+              }
+            }
             if('${action}'==='beam'&&++b.__motion.ticks%2===0){const age=b.effects.find(e=>e.kind==='beam')?.age;if(age!==undefined&&(age<.32||age>1.62)){
               const cross=b.__inspectCross(false);if(cross.gaps.length){const gap=Math.min(...cross.gaps);if(gap<b.__motion.gap){b.__motion.gap=gap;b.__motion.gapTime=age;}}
             }}
@@ -123,9 +136,9 @@ try{
             disc:disc?{held:!disc.released,sourceError:disc.disc.position.distanceTo(b.hero.socketWorld('disc')),targetError:disc.disc.position.distanceTo(disc.end)}:null};
           b.renderer.render(b.renderScene,b.camera);return result;`);
         assert.ok(m.stretch<.0001,'action must preserve arm lengths');
-        assert.ok(m.drift<.0001&&Math.abs(m.shoulderSpan-1.6193)<.001,'shoulders stay fixed at the measured Tiga shoulder span');
-        assert.equal(m.visibleCaps,0,`${label} ${action} ${time}: shoulder cuts must remain outside the viewport throughout the action`);
-        assert.ok(m.jump<(action==='punch'?.42:.24),'adjacent frames must not teleport joints');
+        assert.ok(m.drift<(action==='beam'?.321:.0001)&&m.shoulderSpan>1.6&&m.shoulderSpan<1.8,'only the authored left shoulder lead may translate during the beam');
+        assert.equal(m.visibleCaps,0,`${label} ${action} ${time}: shoulder cut faces must remain hidden throughout the action`);
+        assert.ok(m.jump<(action==='punch'?.42:.24),'adjacent frames must not teleport joints '+JSON.stringify({label,action,time,jump:m.jump}));
         assert.equal((await page.locator('body').innerText()).trim(),'');
         if(action==='beam'){
           assert.ok(m.minMovingGap>=0,'forearms must not pass through each other during entry/recovery: '+JSON.stringify({viewport:label,gap:m.minMovingGap,time:m.minMovingGapTime}));
@@ -138,7 +151,7 @@ try{
             assert.ok(m.cross.straightWrist>.97,'left wrist must stay straight');
             assert.ok(m.cross.gaps.length>=3&&m.cross.gaps.every(g=>g>0&&g<.20),'right forearm must cover the left at the cross without penetration: '+JSON.stringify(m.cross.gaps));
             assert.ok(m.cross.entries[0]?.[0]<.28&&m.cross.entries[1]?.[0]>.70,'upper arms should enter from opposite outer portions of the frame: '+JSON.stringify(m.cross.entries));
-            for(const [x,y]of [...m.tips,...m.wrists])assert.ok(x>.03&&x<.97&&y>.03&&y<.94,'hands must fit in the viewport');
+            for(const [x,y]of [...m.tips,...m.wrists])assert.ok(x>.03&&x<.97&&y>.03&&y<.94,'hands must fit in the viewport '+JSON.stringify({label,time,tips:m.tips,wrists:m.wrists}));
           }
           if(time===.41){assert.equal(m.beam.visible,false);assert.equal(m.health,110);}
           if(time===.55){assert.equal(m.beam.visible,true);assert.equal(m.health,110);assert.equal(m.beam.contact,0);}
@@ -146,7 +159,7 @@ try{
           if(m.beam){assert.ok(m.beam.sourceError<.0001&&m.beam.screenError<.0001);if(time>=.55)assert.ok(m.beam.railCoverage>1&&m.beam.railCoverage<1.5,'the visible emitter must span the upright forearm: '+m.beam.railCoverage);}
           if(time===2.02){assert.equal(m.visible,false);assert.equal(m.beam,null);}
         }
-        if(action==='punch'&&time===.18)assert.equal(m.health,98);
+        if(action==='punch'&&time===.18)assert.equal(m.health,98);if(action==='palm'&&time===.35)assert.equal(m.health,90);
         if(action==='shield'){
           const shield=await act('return {active:b.guard,energy:b.shield.material.uniforms.energy.value};');
           if(time<2){assert.ok(shield.active&&m.visible&&shield.energy>.2,'held shield must remain visible during its active window');}

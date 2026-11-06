@@ -45,3 +45,24 @@ Distributed under Apache-2.0; see public/vendor/LICENSE and the upstream model d
 ## Optional font
 
 Noto Sans SC via Google Fonts, SIL Open Font License. The page falls back to installed system fonts. No font binaries are redistributed.
+
+## Kenney City Kit Commercial 2.1
+
+Building models by Kenney, CC0. https://kenney.nl/assets/city-kit-commercial
+Original license is included at public/models/city/License.txt.
+
+## Red King
+Model by Violi / SlightlyPurplish, published by chaosFerEBIRTH (syafiq14), CC BY 4.0.
+https://sketchfab.com/3d-models/red-king-ultraman-kaiju-all-time-2b1f4461cf454c178814b2948a442fd0
+Adapted materials, textures and authored battle animation clips for the web export.
+
+## Alien Baltan
+Published by peak_9.20, CC BY 4.0.
+https://sketchfab.com/3d-models/alien-baltan-892f5bc4c9064d96a42790872c5a6977
+Original skinned model and animation clips, normalized in the game scene.
+Character designs belong to their respective rights holders.
+
+## Gan Q from Ultraman Gaia
+By aquanort, CC BY 4.0.
+https://sketchfab.com/3d-models/gan-q-from-ultraman-gaia-67e87e6be58d46e7b7b87aaf1eb40f72
+Adapted the legacy material to metallic-roughness and corrected the display-root orientation. Original static mesh and textures, with game-side whole-body motion.

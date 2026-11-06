@@ -19,10 +19,13 @@ function frame(forward,normal){
 function state(upper,forearm,normal,preset,handForward=forearm){
   return {upper:upper.normalize(),forearm:frame(forearm,normal),hand:frame(handForward,normal),shape:{[preset]:1}};
 }
-function copyPose(p){return{forearm:p.forearm.clone(),hand:p.hand.clone(),upper:p.upper.clone(),shape:{...p.shape}};}
+function copyPose(p){return{forearm:p.forearm.clone(),hand:p.hand.clone(),upper:p.upper.clone(),shift:p.shift?.clone()||v(),shape:{...p.shape}};}
 function blend(a,b,t){t=ease(t);const shape={};for(const n of shapes)shape[n]=(a.shape[n]||0)*(1-t)+(b.shape[n]||0)*t;
   const swing=q().setFromUnitVectors(a.upper,b.upper);
-  return {forearm:a.forearm.clone().slerp(b.forearm,t),hand:a.hand.clone().slerp(b.hand,t),upper:a.upper.clone().applyQuaternion(q().slerp(swing,t)),shape};
+  const shift=a.shift?.clone()||v(),destination=b.shift||v();
+  const retracting=shift.lengthSq()>destination.lengthSq();
+  shift.lerp(destination,retracting?Math.min(1,t*3):t);
+  return {forearm:a.forearm.clone().slerp(b.forearm,t),hand:a.hand.clone().slerp(b.hand,t),upper:a.upper.clone().applyQuaternion(q().slerp(swing,t)),shift,shape};
 }
 
 class ArmRig {
@@ -125,15 +128,16 @@ class ArmRig {
   orient(bone,desiredCameraQ){const world=this.camera.getWorldQuaternion(q()).multiply(desiredCameraQ);bone.quaternion.copy(bone.parent.getWorldQuaternion(q()).invert().multiply(world));bone.updateWorldMatrix(false,true);}
   apply(pose){
     const forward=v(0,1,0).applyQuaternion(pose.forearm),normal=v(0,0,1).applyQuaternion(pose.forearm);
-    const elbow=this.mount.clone().addScaledVector(pose.upper,this.upperLength);
+    const mount=this.mount.clone().add(pose.shift||v());
+    const elbow=mount.clone().addScaledVector(pose.upper,this.upperLength);
     const wrist=elbow.clone().addScaledVector(forward,this.lowerLength);
-    this.root.quaternion.identity();this.root.scale.setScalar(1);this.root.position.copy(this.mount).sub(this.shoulder);this.root.updateWorldMatrix(true,true);
+    this.root.quaternion.identity();this.root.scale.setScalar(1);this.root.position.copy(mount).sub(this.shoulder);this.root.updateWorldMatrix(true,true);
     const upperRotation=frame(pose.upper,normal).multiply(this.upperFrame).multiply(this.restUpperQ);
     this.orient(this.upper,upperRotation);
     this.orient(this.lower,pose.forearm.clone().multiply(this.lowerFrame).multiply(this.restLowerQ));
     this.orient(this.hand,pose.hand.clone().multiply(this.handFrame).multiply(this.restHandQ));
     this.applyShape(pose.shape);this.root.updateWorldMatrix(true,true);
-    this.current={wrist,elbow,shoulder:this.mount.clone(),forearm:forward,normal,shape:{...pose.shape}};
+    this.current={wrist,elbow,shoulder:mount,forearm:forward,normal,shape:{...pose.shape}};
   }
   metrics(){const cameraPoint=bone=>this.camera.worldToLocal(bone.getWorldPosition(v()));return{wrist:cameraPoint(this.hand),elbow:cameraPoint(this.lower),shoulder:cameraPoint(this.upper)};}
 }
@@ -143,7 +147,7 @@ export class HeroAnimation {
     this.camera=camera;
     this.rigs=arms.map((arm,index)=>new ArmRig(arm,index?'R':'L',camera));
     this.lens=new ViewmodelLens(camera,arms);
-    this.sockets={beam:v(),disc:v()};
+    this.sockets={beam:v(),disc:v(),palm:v()};
     this.reset();
   }
 
@@ -157,7 +161,7 @@ export class HeroAnimation {
 
     // The eye midpoint and shoulder span come from Tiga's rest mesh. Turn the
     // torso slightly into the stance and allow framing space in front of the
-    // eyes. Each shoulder stays at its mount throughout every action.
+    // eyes. The beam adds a staged left-shoulder lead after the arm rises.
     const stance=THREE.MathUtils.degToRad(10);
     const vertical=Math.tan(THREE.MathUtils.degToRad(this.lens.camera.fov/2));
     const horizontal=vertical*aspect;
@@ -175,7 +179,8 @@ export class HeroAnimation {
     for(const rig of this.rigs)rig.mount.z-=framingDepth;
 
     this.neutral=[-1,1].map(sign=>state(v(sign*.74,-.64,-.20),v(sign*.62,.65,-.43),v(0,0,1),'rest'));
-    this.shield=[-1,1].map(sign=>state(v(sign*.62,-.35,-.70),v(-sign*.60,.92,-.35),v(0,0,1),'shield'));
+    this.shield=[-1,1].map(sign=>state(v(-sign*.4,-.6,-1),v(-sign*.9,.9,-.10),v(0,0,1),'fist'));
+    this.boxing=[-1,1].map(sign=>state(v(sign*.62,-.35,-.70),v(-sign*.60,.92,-.35),v(0,0,1),'fist'));
     this.beamUp=null;
     this.syncBeamPose();
     this.discHeld=this.discPose(false);
@@ -186,11 +191,14 @@ export class HeroAnimation {
     const worldUp=v(0,1,0).applyQuaternion(this.camera.getWorldQuaternion(q()).invert());
     if(this.beamUp&&this.beamUp.distanceToSquared(worldUp)<1e-10)return;
     this.beamUp=worldUp;
+    this.beamBase=this.beamPose(worldUp,0);
     this.beam=this.beamPose(worldUp);
   }
 
-  beamPose(up){
+  beamPose(up,lead=1){
     const [left,right]=this.rigs;
+    const shoulderShift=v(0,THREE.MathUtils.lerp(.25,.08,this.narrow),-THREE.MathUtils.lerp(.2,.04,this.narrow)).multiplyScalar(lead);
+    const leftMount=left.mount.clone().add(shoulderShift);
     const mix=(wide,narrow)=>THREE.MathUtils.lerp(wide,narrow,this.narrow);
     const side=v(1,0,0).addScaledVector(up,-up.x).normalize();
     const forward=up.clone().cross(side).normalize();
@@ -210,7 +218,7 @@ export class HeroAnimation {
     // Both centerlines project through one crossing, with room for the skin.
     const separation=mix(.33,.41);
     const farCross=nearCross.clone().multiplyScalar(1+separation/-nearCross.z);
-    const offset=farCross.clone().sub(left.mount);
+    const offset=farCross.clone().sub(leftMount);
     // Back-project the horizontal stroke of the cross into a plane through
     // the eye. Perspective now keeps it square to the physically upright arm.
     const projectedUp=v(up.x-elbow.x/elbow.z*up.z,up.y-elbow.y/elbow.z*up.z).normalize();
@@ -234,7 +242,8 @@ export class HeroAnimation {
     const toCross=along-Math.sqrt(Math.max(0,radius**2-distance**2+along**2));
     const leftElbow=farCross.clone().addScaledVector(across,-toCross);
     const handAcross=across.clone().addScaledVector(up,-across.dot(up)).normalize();
-    const horizontal=state(leftElbow.sub(left.mount),across,up,'blade',handAcross);
+    const horizontal=state(leftElbow.sub(leftMount),across,up,'blade',handAcross);
+    horizontal.shift=shoulderShift;
     const upright=state(elbow.sub(right.mount),up,side,'blade');
     horizontal.hand.multiply(left.palmAlignment);
     upright.hand.multiply(right.palmAlignment);
@@ -242,7 +251,7 @@ export class HeroAnimation {
   }
 
   punchPose(side,extended){
-    const poses=this.shield.map(copyPose);
+    const poses=this.boxing.map(copyPose);
     for(const pose of poses)pose.shape={fist:1};
     const index=side==='left'?0:1,sign=index?1:-1;
     poses[index]=extended
@@ -261,7 +270,7 @@ export class HeroAnimation {
 
   reset(){
     this.prepareLayout();
-    this.action=null;
+    this.action=null;this.recover=null;
     this.entry=null;
     this.guard=0;
     this.current=this.neutral.map(copyPose);
@@ -269,11 +278,13 @@ export class HeroAnimation {
     this.updateSockets();
   }
 
-  update({beam,disc,punch,guard,dt}){
+  update({beam,disc,palm,punch,guard,dt}){
     this.prepareLayout();
-    const active=beam||disc||punch;
+    const active=beam||disc||palm||punch;
     if(active)this.guard=0;
     if(active!==this.action){
+      if(!active&&this.action&&this.action.age<this.action.duration-.03)this.recover={poses:this.current.map(copyPose),age:0};
+      if(active)this.recover=null;
       this.action=active;
       this.entry=this.current.map(copyPose);
     }
@@ -283,13 +294,17 @@ export class HeroAnimation {
       const t=beam.age;
       if(t<BEAM_TIMING.ready){
         const phase=t/BEAM_TIMING.ready;
-        target=[blend(this.entry[0],this.beam[0],(phase-.15)/.85),blend(this.entry[1],this.beam[1],phase/.76)];
+        target=[blend(this.entry[0],this.beamBase[0],(phase-.15)/.85),blend(this.entry[1],this.beamBase[1],phase/.76)];
       }else if(t<BEAM_TIMING.lightEnd){
-        target=this.beam;
+        target=this.beamBase.map((pose,i)=>blend(pose,this.beam[i],(t-BEAM_TIMING.ready)/.12));
       }else{
         const phase=(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd);
         target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
       }
+    }else if(palm){
+      const poses=this.neutral.map(copyPose);
+      poses[1]=state(v(-.26,.18,-1),v(-.22,.12,-1),v(0,0,1),'shield');
+      target=poses.map((pose,i)=>palm.age<.18?blend(this.entry[i],pose,palm.age/.18):blend(pose,this.neutral[i],(palm.age-.36)/.36));
     }else if(disc){
       const t=disc.age;
       if(t<DISC_TIMING.ready)target=this.discHeld.map((p,i)=>blend(this.entry[i],p,t/DISC_TIMING.ready));
@@ -306,17 +321,19 @@ export class HeroAnimation {
       else if(t<.18)target=hit.map((p,i)=>blend(chamber[i],p,(t-.05)/.13));
       else target=this.neutral.map((p,i)=>blend(hit[i],p,(t-.18)/.18));
     }else{
-      this.guard=THREE.MathUtils.damp(this.guard,guard,12,dt);
+      this.guard=THREE.MathUtils.damp(this.guard,guard,9,dt);
       target=this.shield.map((p,i)=>blend(this.neutral[i],p,this.guard));
+      if(this.recover){this.recover.age+=dt;target=target.map((pose,i)=>blend(this.recover.poses[i],pose,this.recover.age/.24));if(this.recover.age>=.24)this.recover=null;}
     }
     this.current=target;
     this.rigs.forEach((rig,index)=>rig.apply(target[index]));
     this.updateSockets();
-    return !!active||this.guard>.01;
+    return !!active||!!this.recover||this.guard>.01;
   }
 
   updateSockets(){
     const rig=this.rigs[1],right=rig.metrics();
+    this.sockets.palm.copy(right.wrist).add(v(0,0,-.14));
     this.sockets.beam.copy(right.elbow).lerp(right.wrist,.73).add(v(0,0,-.18));
     const tip=rig.nodes.Mid3_R.localToWorld(rig.tipLocal.Mid.clone());
     const forward=v(0,1,0).applyQuaternion(this.current[1].hand);

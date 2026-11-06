@@ -18,7 +18,7 @@ const scripts=(await readdir('src')).filter(name=>name.endsWith('.js'));
 const sources=await Promise.all(scripts.map(name=>readFile(`src/${name}`,'utf8')));
 const entry=await readFile('index.html','utf8'),css=await readFile('style.css','utf8');
 const revision=createHash('sha256').update(entry+css+sources.join('\n')+await readFile('public/poses.svg','utf8'));
-for(const model of ['basalt','leviathan','nova','hero-hands'])revision.update(await readFile(`public/models/kaiju/${model}.glb`));
+for(const model of ['redking','baltan','ganq','hero-hands'])revision.update(await readFile(`public/models/kaiju/${model}.glb`));
 const version=revision.digest('hex').slice(0,12);
 for(let i=0;i<scripts.length;i++)await writeFile(`dist/src/${scripts[i]}`,sources[i].replace(/(['"])(\.{1,2}\/[^'"\s]+\.js)\1/g,(_,quote,url)=>`${quote}${url}?v=${version}${quote}`));
 await writeFile('dist/index.html',entry.replace('./style.css','./style.css?v='+version).replace('./src/main.js','./src/main.js?v='+version).replaceAll('./public/poses.svg#','./public/poses.svg?v='+version+'#'));
