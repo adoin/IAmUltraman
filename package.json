@@ -13,7 +13,8 @@
     "test:preload": "node scripts/preload-check.mjs",
     "test:models": "node scripts/models-check.mjs",
     "test:tiga": "node scripts/tiga-check.mjs",
-    "test:animation": "node scripts/animation-check.mjs"
+    "test:animation": "node scripts/animation-check.mjs",
+    "test:enemies": "node scripts/enemy-attacks-check.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.32",

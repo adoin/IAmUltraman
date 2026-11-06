@@ -54,12 +54,12 @@ Original license is included at public/models/city/License.txt.
 ## Red King
 Model by Violi / SlightlyPurplish, published by chaosFerEBIRTH (syafiq14), CC BY 4.0.
 https://sketchfab.com/3d-models/red-king-ultraman-kaiju-all-time-2b1f4461cf454c178814b2948a442fd0
-Adapted materials, textures and authored battle animation clips for the web export.
+Adapted materials and textures, repaired hand/foot parent chains and authored runtime combat motion.
 
 ## Alien Baltan
 Published by peak_9.20, CC BY 4.0.
 https://sketchfab.com/3d-models/alien-baltan-892f5bc4c9064d96a42790872c5a6977
-Original skinned model and animation clips, normalized in the game scene.
+Original skinned model and animation clips, normalized in the game scene. Game playback adapts root translation and attack contact timing.
 Character designs belong to their respective rights holders.
 
 ## Gan Q from Ultraman Gaia

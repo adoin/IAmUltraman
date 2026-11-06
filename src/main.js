@@ -16,7 +16,7 @@ function battleEvent(event){
   if(event.type==='wave'){say(event.wave===5?'最后一战，相信光！':`第 ${event.wave} 波 · 新的挑战`);$('scene-status').textContent='摆出招式，守护城市';}
   if(event.type==='attacked'){$('scene-status').textContent='守护能量正在消耗，释放绝招击退怪兽';tone('hit');}
   if(event.type==='telegraph'){$('threat').hidden=false;$('threat-name').textContent=`${event.config.name} · 正在蓄力`;$('threat-hint').textContent=event.attack.kind==='sweep'?`向${event.attack.safeSide>0?'右':'左'}侧身，或交叉双臂防御`:event.config.hint;tone('warning');}
-  if(event.type==='enemy-cast'){$('threat-name').textContent=`${ATTACKS[event.attack.kind].name} · 来了！`;tone('hit');}
+  if(event.type==='enemy-cast'){$('threat-name').textContent=`${event.attack.name||ATTACKS[event.attack.kind].name} · 来了！`;tone('hit');}
   if(event.type==='interrupt'){$('threat').hidden=true;say('打断成功！',1000);tone('win');}
   if(event.type==='defense'){$('threat').hidden=true;if(event.outcome==='block'){say('护盾挡住了！',1000);tone('win');}if(event.outcome==='dodge'){say('漂亮的闪避！',1000);tone('win');}}
   if(event.type==='wave'||event.type==='defeat')$('threat').hidden=true;

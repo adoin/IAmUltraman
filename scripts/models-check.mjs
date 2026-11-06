@@ -10,7 +10,7 @@ try{
  const frame=dt=>act(`for(let t=0;t<${dt}-1e-8;t+=1/60)b.advance(Math.min(1/60,${dt}-t));b.renderer.render(b.renderScene,b.camera);`);
  await act('b.renderer.setAnimationLoop(null);b.start();b.nextAttack=100;');await frame(.2);await page.screenshot({path:out+'/city-redking.png'});
  const models=await act(`return ['redking','baltan','ganq'].map(name=>{const m=b.models.get(name),bounds=new T.Box3().setFromObject(m);let skins=0,mapped=0;m.traverse(o=>{if(o.isSkinnedMesh)skins++;if(o.isMesh&&o.material.map?.image)mapped++;});return{name,skins,mapped,size:bounds.getSize(new T.Vector3()).toArray(),clips:b.monsterAnimations.get(name).map(c=>c.name)};});`);
- for(const m of models){assert.ok(m.mapped>0&&(m.name==='ganq'||m.skins>0&&m.clips.length>=5)&&m.size.every(Number.isFinite),JSON.stringify(m));}
+ for(const m of models){assert.ok(m.mapped>0&&(m.name==='ganq'||m.skins>0&&(m.name==='redking'||m.clips.length>=5))&&m.size.every(Number.isFinite),JSON.stringify(m));}
  await page.keyboard.press('f');await frame(.4);assert.equal(await act('return b.monsterHealth'),110);
  await act("b.beginAttack('charge')");await frame(4.3);assert.ok(await act('return b.inMelee&&b.currentMonster.position.z>0'));await page.screenshot({path:out+'/near.png'});
  assert.equal(await act("return b.cast('beam')"),false);assert.equal(await act('return b.lastCast.beam'),-100);

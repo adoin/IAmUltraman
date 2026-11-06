@@ -27,7 +27,7 @@ try{
   await page.locator('#show-moves').click();assert.equal(await page.locator('.punch-guide').isVisible(),true);await page.keyboard.press('Escape');
   await page.screenshot({path:path.join(artifacts,'preparation.png'),fullPage:true});
   await page.locator('#start-keyboard').click();await page.waitForTimeout(500);await act('b.nextAttack=100');await clean();assert.equal(await act('return b.hands.visible'),false);assert.equal(await act('return b.targetRing.visible||b.warningRing.visible||b.safeZone.visible'),false);
-  assert.equal(await page.locator('video').count(),0);
+  await act('b.nextAttack=100;');assert.equal(await page.locator('video').count(),0);
   await page.keyboard.down('w');await page.keyboard.press('w');await page.keyboard.up('w');
   assert.deepEqual(await page.evaluate(()=>window.__pipShortcut),{events:0,requests:0,errors:[]});
   assert.equal(await page.evaluate(()=>document.activeElement.id),'game');
