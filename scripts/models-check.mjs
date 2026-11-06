@@ -5,7 +5,7 @@ const out=process.env.BROWSER_ARTIFACT_DIR||'D:/tmp/ultraman-city-melee/range';a
 const browser=await chromium.launch({channel:'chrome',headless:true});
 try{
  const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(String(e)));page.on('response',r=>{if(r.status()>=400&&!r.url().includes('favicon'))errors.push(r.status()+' '+r.url());});
- await page.goto(process.env.GAME_URL||'http://127.0.0.1:4173',{waitUntil:'networkidle'});await page.locator('#start-keyboard').click();
+ await page.goto(process.env.GAME_URL||'http://127.0.0.1:4173',{waitUntil:'networkidle'});await page.locator('#start-keyboard').click();await page.waitForFunction(()=>document.body.classList.contains('in-battle'));
  const act=code=>page.evaluate(async code=>{const{battle:b}=await import(document.querySelector('script[type=module]').src);const T=await import('three');return new Function('b','T',code)(b,T);},code);
  const frame=dt=>act(`for(let t=0;t<${dt}-1e-8;t+=1/60)b.advance(Math.min(1/60,${dt}-t));b.renderer.render(b.renderScene,b.camera);`);
  await act('b.renderer.setAnimationLoop(null);b.start();b.nextAttack=100;');await frame(.2);await page.screenshot({path:out+'/city-redking.png'});
@@ -20,5 +20,5 @@ try{
  await page.keyboard.press('j');await frame(.55);await act('b.visualEffects.forEach(e=>e.group.visible=false);b.renderer.render(b.renderScene,b.camera);');await page.screenshot({path:out+'/cross.png'});await act('b.enemyDistance=13;');await frame(.25);assert.equal(await act("return b.effects.some(e=>e.kind==='beam')||b.visualEffects.some(e=>e.kind==='beam')"),false);
  await act("b.start();b.wave=2;b.monsterHealth=145;b.monsterMax=145;b.selectMonster();b.nextAttack=100;");await frame(.5);await page.screenshot({path:out+'/baltan.png'});
  await act('b.wave=3;b.selectMonster();b.nextAttack=100;');await frame(.5);await page.screenshot({path:out+'/ganq.png'});
- assert.equal((await page.locator('body').innerText()).trim(),'');assert.deepEqual(errors,[]);console.log('PASS real models, city textures, misses at range, charge, X shield, third-hit retreat, palm, remote cancellation and clean battle',JSON.stringify(models));
+ assert.equal((await page.locator('body').innerText()).trim(),(await page.locator('.battle-hud').innerText()).trim());assert.deepEqual(errors,[]);console.log('PASS real models, city textures, misses at range, charge, X shield, third-hit retreat, palm, remote cancellation and clean battle',JSON.stringify(models));
 }finally{await browser.close();}

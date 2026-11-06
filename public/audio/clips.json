@@ -1,0 +1,63 @@
+{
+  "model": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+  "speaker": "Ryan",
+  "language": "Chinese",
+  "clips": [
+    {
+      "key": "start",
+      "text": "小英雄，准备出发！相信自己，守护城市！",
+      "duration": 3.657,
+      "bytes": 17786,
+      "sha256": "39c7010707a2d44b6c90e74e61fb5be8c3f1c27847df504c8e819166903b6f20"
+    },
+    {
+      "key": "finish",
+      "text": "就是现在，奥特曼！用梅特里姆光线，终结它！",
+      "duration": 3.497,
+      "bytes": 18287,
+      "sha256": "330b23664e7c3a724a7d3b89657a8f5aeaaa9d8e026a402914846d9c400c60fc"
+    },
+    {
+      "key": "hurt1",
+      "text": "没关系，站稳脚步！看准怪兽的动作，再来！",
+      "duration": 3.577,
+      "bytes": 17872,
+      "sha256": "d7c07ba4ffd53ff833e0febedad7ee3b9c45052862d608bbb92d09616738867a"
+    },
+    {
+      "key": "hurt2",
+      "text": "别着急，你能行！交叉双臂，挡住下一次攻击！",
+      "duration": 4.617,
+      "bytes": 22439,
+      "sha256": "61d0a7682ef9104d15b994175982b848df6ee461dfa695394c1e422d1b166994"
+    },
+    {
+      "key": "low",
+      "text": "能量不多了，别放弃！先侧身闪避，稳住！",
+      "duration": 3.977,
+      "bytes": 18852,
+      "sha256": "cc3a5c1aff8577e2ed075d2205d208446097a05289e835d06995f525bc09cfef"
+    },
+    {
+      "key": "push",
+      "text": "漂亮！怪兽被击退了！趁现在，拉开距离！",
+      "duration": 4.32,
+      "bytes": 21092,
+      "sha256": "8dc14593e83ef63eba32fc848f774030caaa6b7362af4765a839f032c45bf309"
+    },
+    {
+      "key": "block",
+      "text": "挡得漂亮！光之护盾，保护了你！",
+      "duration": 3.257,
+      "bytes": 17472,
+      "sha256": "3b30de5b7e6ed4df0ba4b8282b797525053eb2b1684b0e4e882a56cfadddae97"
+    },
+    {
+      "key": "dodge",
+      "text": "好身手！继续保持，别让怪兽打中！",
+      "duration": 3.097,
+      "bytes": 15413,
+      "sha256": "2b5a76e931982e9b093f2639a313a39fb8c52bd2f227169c15ebc5c77979067e"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "start": "start.ogg",
+  "finish": "finish.ogg",
+  "hurt1": "hurt1.ogg",
+  "hurt2": "hurt2.ogg",
+  "low": "low.ogg",
+  "push": "push.ogg",
+  "block": "block.ogg",
+  "dodge": "dodge.ogg"
+}

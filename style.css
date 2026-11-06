@@ -18,3 +18,11 @@
 
 .skill-grid,.guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:600px){.guide-grid{grid-template-columns:1fr}}
+
+/* During combat only the two health bars remain above the world. */
+.in-battle .arena>.battle-hud:not(#game){display:flex!important;position:fixed;top:max(18px,env(safe-area-inset-top));left:4vw;right:4vw;gap:24px;z-index:3;align-items:flex-start}
+.in-battle .battle-hud .wave-badge,.in-battle .battle-hud .avatar,.in-battle .battle-hud small{display:none}
+.in-battle .hero-hud,.in-battle .monster-hud{width:min(32vw,290px);padding:10px 13px 12px;background:linear-gradient(110deg,#0b203bd9,#0b203b70);border:1px solid #c1e8ff22;border-radius:10px}
+.in-battle .health-track{height:7px;background:#0007}.in-battle .hud-name{font-size:12px;margin-bottom:8px;flex-wrap:nowrap;white-space:nowrap;text-shadow:0 1px 2px #000}
+.hud-name b{font-size:10px;font-variant-numeric:tabular-nums;font-weight:500;color:#dce9f2}.monster-hud .hud-name{flex-wrap:wrap;gap:5px}.monster-hud #monster-type{display:none}
+@media(max-width:600px){.in-battle .hero-hud,.in-battle .monster-hud{width:44vw;padding:8px}.in-battle .battle-hud{gap:12px;left:3vw;right:3vw}.in-battle .hud-name{font-size:10px}.hud-name b{font-size:9px}}

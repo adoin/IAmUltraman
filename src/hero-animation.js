@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {BEAM_TIMING,DISC_TIMING} from './action-timing.js';
+import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
 import {ViewmodelLens} from './viewmodel-lens.js';
 
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -317,11 +317,12 @@ export class HeroAnimation {
     return poses;
   }
 
-  discPose(release){
+  discPose(release,side='right'){
     const poses=this.neutral.map(copyPose);
-    poses[1]=release
-      ?state(v(-.24,.16,-1),v(-.40,.16,-1),v(0,1,0),'blade',v(-.62,.07,-1))
-      :state(v(.35-.22*this.narrow,-.34,-.90),v(-.18-.15*this.narrow,.90,-.33),v(0,0,1),'disc');
+    const index=side==='left'?0:1,sign=index?1:-1;
+    poses[index]=release
+      ?state(v(-sign*.30,.05,-1),v(-sign*.24,.02,-1),v(0,1,0),'blade',v(-sign*.3,.03,-1))
+      :state(v(sign*.45,.12,-1),v(-sign*.22,.98,-.3),v(0,0,1),'disc');
     return poses;
   }
 
@@ -329,16 +330,21 @@ export class HeroAnimation {
     this.prepareLayout();
     this.action=null;this.recover=null;
     this.entry=null;
-    this.guard=0;
+    this.guard=0;this.discSide='right';this.preparing=false;
     this.current=this.neutral.map(copyPose);
     this.rigs.forEach((rig,index)=>{rig.restore();rig.apply(this.current[index]);});
     this.updateSockets();
   }
 
-  update({beam,disc,palm,punch,guard,dt}){
+  update({beam,disc,discPreparation,palm,punch,guard,dt}){
     this.prepareLayout();
     const active=beam||disc||palm||punch;
     if(active)this.guard=0;
+    if(!active&&!discPreparation&&this.preparing)this.recover={poses:this.current.map(copyPose),age:0};
+    const wasPreparing=this.preparing;this.preparing=!!discPreparation&&!active&&!guard;
+    if(this.preparing&&!wasPreparing){this.prepEntry=this.current.map(copyPose);this.prepAge=0;}
+    if(this.preparing)this.prepAge+=dt;
+    if(disc||discPreparation)this.discSide=(disc||discPreparation).side||'right';
     if(active!==this.action){
       if(!active&&this.action&&this.action.age<this.action.duration-.03)this.recover={poses:this.current.map(copyPose),age:0};
       if(active)this.recover=null;
@@ -364,20 +370,19 @@ export class HeroAnimation {
       poses[1]=state(v(-.26,.18,-1),v(-.22,.12,-1),v(0,0,1),'shield');
       target=poses.map((pose,i)=>palm.age<.18?blend(this.entry[i],pose,palm.age/.18):blend(pose,this.neutral[i],(palm.age-.36)/.36));
     }else if(disc){
-      const t=disc.age;
-      if(t<DISC_TIMING.ready)target=this.discHeld.map((p,i)=>blend(this.entry[i],p,t/DISC_TIMING.ready));
-      else if(t<DISC_TIMING.release)target=this.discRelease.map((p,i)=>blend(this.discHeld[i],p,(t-DISC_TIMING.ready)/(DISC_TIMING.release-DISC_TIMING.ready)));
-      else target=this.neutral.map((p,i)=>blend(this.discRelease[i],p,(t-DISC_TIMING.release)/(DISC_TIMING.end-DISC_TIMING.release)));
+      const t=disc.age,timing=discTiming(disc),held=this.discPose(false,this.discSide),released=this.discPose(true,this.discSide),index=this.discSide==='left'?0:1;
+      target=this.entry.map((pose,i)=>blend(pose,this.neutral[i],t/.18));
+      if(t<timing.ready)target[index]=blend(this.entry[index],held[index],t/timing.ready);
+      else if(t<timing.release)target[index]=blend(held[index],released[index],(t-timing.ready)/(timing.release-timing.ready));
+      else target[index]=blend(released[index],this.neutral[index],(t-timing.release)/(timing.end-timing.release));
     }else if(punch){
-      const chamber=this.punchPose(punch.side,false).map((pose,i)=>{
-        const gathered=blend(this.entry[i],pose,.40);
-        gathered.shape={fist:1};
-        return gathered;
-      });
-      const hit=this.punchPose(punch.side,true),t=punch.age;
-      if(t<.05)target=chamber.map((p,i)=>blend(this.entry[i],p,t/.05));
-      else if(t<.18)target=hit.map((p,i)=>blend(chamber[i],p,(t-.05)/.13));
-      else target=this.neutral.map((p,i)=>blend(hit[i],p,(t-.18)/.18));
+      const index=punch.side==='left'?0:1,t=punch.age,hit=this.punchPose(punch.side,true)[index];
+      target=this.entry.map((pose,i)=>blend(pose,this.neutral[i],t/.16));
+      if(t<.18)target[index]=blend(this.entry[index],hit,t/.18);
+      else target[index]=blend(hit,this.neutral[index],(t-.18)/.18);
+    }else if(this.preparing){
+      const held=this.discPose(false,this.discSide),index=this.discSide==='left'?0:1;
+      target=this.neutral.map(copyPose);target[index]=blend(this.prepEntry[index],held[index],Math.min(this.prepAge/.32,Math.max(.08,discPreparation.progress)));
     }else{
       this.guard=THREE.MathUtils.damp(this.guard,guard,9,dt);
       target=this.shield.map((p,i)=>blend(this.neutral[i],p,this.guard));
@@ -386,15 +391,16 @@ export class HeroAnimation {
     this.current=target;
     this.rigs.forEach((rig,index)=>rig.apply(target[index]));
     this.updateSockets();
-    return !!active||!!this.recover||this.guard>.01;
+    return !!active||this.preparing||!!this.recover||this.guard>.01;
   }
 
   updateSockets(){
     const rig=this.rigs[1],right=rig.metrics();
     this.sockets.palm.copy(right.wrist).add(v(0,0,-.14));
     this.sockets.beam.copy(right.elbow).lerp(right.wrist,.73).add(v(0,0,-.18));
-    const tip=rig.nodes.Mid3_R.localToWorld(rig.tipLocal.Mid.clone());
-    const forward=v(0,1,0).applyQuaternion(this.current[1].hand);
+    const index=this.discSide==='left'?0:1,discRig=this.rigs[index];
+    const tip=discRig.nodes['Mid3_'+discRig.side].localToWorld(discRig.tipLocal.Mid.clone());
+    const forward=v(0,1,0).applyQuaternion(this.current[index].hand);
     this.sockets.disc.copy(this.camera.worldToLocal(tip)).addScaledVector(forward,this.aspect<1?.28:.35).add(v(0,0,-.04));
   }
 

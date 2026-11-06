@@ -187,6 +187,7 @@ export class MonsterMotion {
         V(0, 1, 0),
         active?.kind === 'melee' ? (side === 'L' ? 1 : -1) * (0.28 * gather - 0.45 * strike) * fade : 0,
       );
+      if(active?.kind==='charge'){const lean=(active.phase==='windup'?ease(active.age/active.windup):1)*fade;this.turn('upperbody1',V(1,0,0),.3*lean);this.turn('neck',V(1,0,0),-.1*lean);}
       if (hurt) this.turn('upperbody1', V(1, 0, 0), -0.13);
       if (dead) this.turn('upperbody1', V(1, 0, 0), -0.55);
       for (const suffix of ['L', 'R']) {

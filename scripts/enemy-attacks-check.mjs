@@ -13,7 +13,7 @@ try {
   page.setDefaultTimeout(90000);
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(process.env.GAME_URL || 'http://127.0.0.1:4173', {waitUntil: 'networkidle'});
-  await page.locator('#start-keyboard').click();
+  await page.locator('#start-keyboard').click();await page.waitForFunction(()=>document.body.classList.contains('in-battle'));
   const act = (code) =>
     page.evaluate(async (code) => {
       const {battle: b} = await import(document.querySelector('script[type=module]').src);
@@ -33,7 +33,7 @@ try {
   for (const [wave, name, kinds] of [
     [1, 'redking', ['melee', 'bolt', 'slam', 'charge']],
     [2, 'baltan', ['melee', 'bolt', 'sweep', 'charge']],
-    [3, 'ganq', ['bolt', 'sweep', 'melee']],
+    [3, 'ganq', ['bolt', 'sweep', 'melee', 'charge']],
   ])
     for (const kind of kinds) {
       const base = await act(

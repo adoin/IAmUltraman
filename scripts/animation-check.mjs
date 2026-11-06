@@ -13,7 +13,7 @@ try{
   page.on('console',e=>{if(e.type()==='error'&&!e.text().includes('favicon')&&e.text()!=='INFO: Created TensorFlow Lite XNNPACK delegate for CPU.')errors.push(e.text());});
   await page.goto(process.env.GAME_URL||'http://127.0.0.1:4173',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.getElementById('load-status').textContent==='海湾准备就绪');
-  await page.locator('#start-keyboard').click();
+  await page.locator('#start-keyboard').click();await page.waitForFunction(()=>document.body.classList.contains('in-battle'));
   const act=code=>page.evaluate(async code=>{const{battle:b}=await import(document.querySelector('script[type=module]').src);const T=await import('three');return new Function('b','T',code)(b,T);},code);
   await act('b.renderer.setAnimationLoop(null);');
   await act(`
@@ -91,7 +91,7 @@ try{
     for(const action of ['beam','punch','disc','palm','shield']){
       await act(`b.start();b.nextAttack=100;b.hero.reset();b.__motion={jump:0,stretch:0,drift:0,caps:0,gap:1,gapTime:0,ticks:0,previous:b.hero.rigs.map(r=>r.metrics()),mounts:b.hero.rigs.map(r=>r.metrics().shoulder),lengths:b.hero.diagnostics().map(r=>[r.forearmLength,r.upperLength])};b.__caps=[];b.hands.traverse(m=>{if(m.isSkinnedMesh&&m.material.name.includes('lining'))b.__caps.push(m);});${action==='shield'?'':action==='punch'?'b.enemyDistance=13;b.punch("right");':`b.cast('${action}');`}`);
       if(action==='shield')await page.keyboard.down('l');
-      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.16,.31,.33,.55,.75,1.18]:action==='punch'?[.06,.18,.28,.40]:action==='palm'?[.08,.18,.35,.55,.8]:[.15,.5,1.95,2.6];
+      const times=action==='beam'?[.16,.24,.28,.34,.41,.55,.65,1.3,1.72,1.8,2.02]:action==='disc'?[.2,.45,.71,.73,.9,1.11,1.58]:action==='punch'?[.06,.18,.28,.40]:action==='palm'?[.08,.18,.35,.55,.8]:[.15,.5,1.95,2.6];
       let previous=0;
       for(const time of times){
         const m=await act(`
@@ -140,7 +140,7 @@ try{
         assert.ok(m.drift<(action==='beam'?.321:.0001)&&m.shoulderSpan>1.6&&m.shoulderSpan<1.8,'only the authored left shoulder lead may translate during the beam');
         assert.equal(m.visibleCaps,0,`${label} ${action} ${time}: shoulder cut faces must remain hidden throughout the action`);
         assert.ok(m.jump<(action==='punch'?.42:.24),'adjacent frames must not teleport joints '+JSON.stringify({label,action,time,jump:m.jump}));
-        assert.equal((await page.locator('body').innerText()).trim(),'');
+        assert.equal((await page.locator('body').innerText()).trim(),(await page.locator('.battle-hud').innerText()).trim());
         if(action==='beam'){
           assert.ok(m.minMovingGap>=0,'forearms must not pass through each other during entry/recovery: '+JSON.stringify({viewport:label,gap:m.minMovingGap,time:m.minMovingGapTime}));
           if(time>=.34&&time<=1.3){
@@ -183,9 +183,9 @@ try{
           else{assert.ok(!shield.active&&!m.visible&&shield.energy<.01,'shield and hands must retract on expiry while L is still held');}
         }
         if(action==='disc'){
-          if(time===.31){assert.equal(m.disc.held,true);assert.ok(m.disc.sourceError<.0001);assert.equal(m.health,110);}
-          if(time===.33)assert.equal(m.disc.held,false);
-          if(time===.75){assert.equal(m.health,79);assert.ok(m.disc.targetError<.0001);}
+          if(time===.71){assert.equal(m.disc.held,true);assert.ok(m.disc.sourceError<.0001);assert.equal(m.health,110);}
+          if(time===.73)assert.equal(m.disc.held,false);
+          if(time===1.11){assert.equal(m.health,79);assert.ok(m.disc.targetError<.0001);}
         }
         report.push({viewport:label,action,...m});
         await page.screenshot({path:path.join(artifacts,`${label}-${action}-${time}.png`)});

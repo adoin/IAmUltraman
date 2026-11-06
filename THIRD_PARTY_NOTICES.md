@@ -66,3 +66,6 @@ Character designs belong to their respective rights holders.
 By aquanort, CC BY 4.0.
 https://sketchfab.com/3d-models/gan-q-from-ultraman-gaia-67e87e6be58d46e7b7b87aaf1eb40f72
 Adapted the legacy material to metallic-roughness and corrected the display-root orientation. Original static mesh and textures, with game-side whole-body motion.
+
+## Qwen3-TTS generated narration
+Eight original Chinese gameplay cues generated with the Qwen team official Studio using Qwen3-TTS-12Hz-1.7B-CustomVoice, Ryan speaker. Model license Apache-2.0; https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice . The model is not redistributed. Texts, processing notes and checksums: public/audio/SOURCE.md and public/audio/clips.json. A copy of the model license is included at public/audio/QWEN3-TTS-LICENSE.txt. No television dialogue recordings or soundtrack audio are bundled. Music and effects are original procedural audio.

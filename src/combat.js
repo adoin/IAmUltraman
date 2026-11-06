@@ -1,4 +1,4 @@
-import {BEAM_TIMING,DISC_TIMING} from './action-timing.js';
+import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
 export const WAVES = [
   {name:'雷德王',model:'redking',title:'海湾入侵者',hp:110,color:0xffcb7a,attacks:['bolt','charge','slam']},
   {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:145,color:0x68d9ff,attacks:['bolt','charge','sweep']},
@@ -7,9 +7,9 @@ export const WAVES = [
   {name:'巴尔坦星人 · 决战',model:'baltan',title:'最终守护战',hp:290,color:0xff8960,attacks:['bolt','sweep','charge']},
 ];
 export const SKILLS={palm:{cooldown:2.2,damage:20,impact:.34,duration:.72},beam:{cooldown:3.2,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},disc:{cooldown:1.65,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
-export const PUNCH={cooldown:.38,damage:12,impact:.18,duration:.36};
+export const PUNCH={cooldown:.28,damage:12,impact:.18,duration:.36};
 export const SHIELD=Object.freeze({duration:2,cooldown:4,drain:10,recharge:14,blockCost:12});
-export const MONSTER_ATTACK_NAMES={redking:{bolt:'岩石投掷',slam:'震地跺脚',melee:'近身直拳',charge:'蛮力冲锋'},baltan:{bolt:'钳爪光弹',sweep:'钳爪光线',melee:'钳爪突刺',charge:'疾步突进'},ganq:{bolt:'巨眼光弹',sweep:'巨眼射线',melee:'巨眼撞击',charge:'巨眼突进'}};
+export const MONSTER_ATTACK_NAMES={redking:{bolt:'岩石投掷',slam:'震地跺脚',melee:'近身直拳',charge:'蛮力冲锋'},baltan:{bolt:'钳爪光弹',sweep:'钳爪光线',melee:'钳爪突刺',charge:'幻影突进'},ganq:{bolt:'巨眼光弹',sweep:'巨眼射线',melee:'巨眼撞击',charge:'巨眼突进'}};
 export const ATTACKS={
   melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:1.0,flight:.3},
   bolt:{name:'能量弹',hint:'向左右侧身躲开，或胸前交叉双臂防御',damage:14,windup:2.2,flight:1.15},
@@ -21,10 +21,10 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /** Deterministic combat simulation, independent of rendering and camera inference. */
 export class BattleEngine {
   constructor(onEvent=()=>{}){this.onEvent=onEvent;this.difficulty='easy';this.practice=false;this.reset();}
-  reset(){this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
+  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
   get waveInfo(){return WAVES[this.wave-1];}
   start(){this.reset();this.playing=true;this.onEvent({type:'wave',wave:1,info:this.waveInfo});}
-  emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}
+  emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,monsterHP:this.monsterHealth,monsterMax:this.monsterMax,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}
   get inMelee(){return this.enemyDistance<=18;}
   interruptRemote(){
     const canceled=this.effects.filter(e=>e.kind!=='punch');
@@ -36,7 +36,7 @@ export class BattleEngine {
     if(this.defeated)return;
     if(this.time<this.retreatUntil){this.enemyDistance=Math.min(this.retreatTarget,this.enemyDistance+34*dt);return;}
     if(this.attack?.kind==='charge'&&this.attack.phase==='flight'){const progress=clamp((this.attack.age+dt)/this.attack.flight,0,1),eased=progress*progress*(3-2*progress);this.enemyDistance=(this.attack.startDistance??this.enemyDistance)*(1-eased)+16.5*eased;}
-    if(this.inMelee)this.interruptRemote();
+    if(this.inMelee){this.discGesture=null;this.interruptRemote();}
   }
   get guardRemaining(){return this.guard?Math.max(0,this.guardUntil-this.time):0;}
   get guardCooldown(){return Math.max(0,this.guardReadyAt-this.time);}
@@ -70,9 +70,10 @@ export class BattleEngine {
     this.guardEnergy=clamp(this.guardEnergy-activeTime*SHIELD.drain+(dt-activeTime)*SHIELD.recharge,0,100);
     if(Math.floor(previousEnergy/2)!==Math.floor(this.guardEnergy/2))this.emit();
   }
-  punch(side='right'){if(!this.playing||this.paused||this.defeated||this.finished||this.effects.some(e=>SKILLS[e.kind])||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.lowerShield();this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
-  cast(skill){const config=SKILLS[skill];if(config&&this.inMelee&&this.playing&&!this.paused&&!this.finished&&!this.defeated){this.onEvent({type:'remote-interrupted'});if(!this.attack)this.beginAttack('melee');return false;}if(!config||!this.playing||this.paused||this.defeated||this.finished||this.effects.some(e=>SKILLS[e.kind]||(e.kind==='punch'&&e.age<PUNCH.impact))||this.time-this.lastCast[skill]<config.cooldown)return false;this.lowerShield();this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,age:0,duration:config.duration,hit:false});this.onEvent({type:'cast',skill});return true;}
-  damage(amount,source='hit'){if(this.defeated||this.finished)return;if(source==='punch'){
+  punch(side='right'){if(!this.playing||this.paused||this.defeated||this.finished||this.effects.some(e=>SKILLS[e.kind])||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.discGesture=null;this.lowerShield();this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
+  setDiscPreparation(preparation){this.discGesture=this.playing&&!this.paused&&!this.defeated&&!this.finished&&!this.guard&&!this.inMelee&&this.time-this.lastCast.disc>=SKILLS.disc.cooldown&&!this.effects.some(e=>SKILLS[e.kind])?preparation:null;}
+  cast(skill,side='right'){const config=SKILLS[skill];if(config&&this.inMelee&&this.playing&&!this.paused&&!this.finished&&!this.defeated){this.onEvent({type:'remote-interrupted'});if(!this.attack)this.beginAttack('melee');return false;}if(!config||!this.playing||this.paused||this.defeated||this.finished||this.effects.some(e=>SKILLS[e.kind]||(e.kind==='punch'&&e.age<PUNCH.impact))||this.time-this.lastCast[skill]<config.cooldown)return false;this.lowerShield();const prepared=skill==='disc'&&!!this.discGesture?.armed&&this.discGesture.side===side,timing=skill==='disc'?discTiming({prepared}):null;this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,side,prepared,age:0,duration:timing?.end??config.duration,impact:timing?.impact??config.impact,hit:false});this.discGesture=null;this.onEvent({type:'cast',skill,side,prepared,timing});return true;}
+  damage(amount,source='hit',side=null){if(this.defeated||this.finished)return;if(source==='punch'){
       if(!this.inMelee)return;
       this.meleeHits++;
       if(this.meleeHits>=3){
@@ -80,7 +81,7 @@ export class BattleEngine {
         this.onEvent({type:'knockback',airborne:this.knockdowns%2===0});
       }
     }
-    this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount,source});
+    this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount,source,side});
     if(this.attack&&this.attack.phase==='windup'&&amount>=40){this.attack=null;this.nextAttack=2.5;this.onEvent({type:'interrupt'});}
     if(this.monsterHealth===0){this.lowerShield();this.defeated=true;this.attack=null;this.stars+=3+this.wave;this.respawn=3;this.heroHealth=Math.min(100,this.heroHealth+15);this.guardEnergy=Math.min(100,this.guardEnergy+30);this.onEvent({type:'defeat',wave:this.wave});}this.emit();}
   beginAttack(kind){if(this.defeated||this.finished||this.attack)return;if(this.time<this.retreatUntil)return;const config=ATTACKS[kind];const fast=this.difficulty==='normal'?.8:1;this.attack={kind,name:MONSTER_ATTACK_NAMES[this.waveInfo.model]?.[kind]||config.name,phase:'windup',age:0,windup:config.windup*fast,flight:config.flight,originLean:this.lean,safeSide:this.attackIndex%2?-1:1};this.onEvent({type:'telegraph',attack:{...this.attack},config:{...config,name:this.attack.name}});}
@@ -96,7 +97,7 @@ export class BattleEngine {
     if(this.heroHealth===0){this.finished=true;this.onEvent({type:'over',stars:this.stars,stats:{...this.stats}});}
   }
   update(dt){if(!this.playing||this.paused||this.finished||dt<=0)return;this.time+=dt;this.updateShield(dt);this.updateDistance(dt);
-    for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=config.impact){effect.hit=true;this.damage(config.damage,effect.kind);}}
+    for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=(effect.impact??config.impact)){effect.hit=true;this.damage(config.damage,effect.kind,effect.side);}}
     this.effects=this.effects.filter(e=>e.age<e.duration);
     if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=5;this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
     if(this.attack){this.attack.age+=dt;if(this.attack.phase==='windup'&&this.attack.age>=this.attack.windup){this.attack.phase='flight';this.attack.age=0;this.attack.startDistance=this.enemyDistance;this.onEvent({type:'enemy-cast',attack:{...this.attack}});}else if(this.attack.phase==='flight'&&this.attack.age>=this.attack.flight)this.resolveAttack();}
