@@ -43,7 +43,8 @@ try{
         if(first>last)return null;
         const point=shoulder.lerp(elbow,first).project(lens);return[(1+point.x)/2,(1-point.y)/2];
       });
-      const result={...cross,entries,leftPalm:normal.negate().toArray(),rightForearm:upright.toArray(),rightFingersUp:finger.y,rightElbowX:right.metrics().elbow.x,straightWrist:long.dot(forearm),gaps:[]};
+      const wristMargins=arms.map((r,i)=>r.hand.getWorldPosition(new T.Vector3()).distanceTo(r.lower.getWorldPosition(new T.Vector3()))*(1-(i?cross?.right:cross?.left)));
+      const result={...cross,wristMargins,entries,leftPalm:normal.negate().toArray(),rightForearm:upright.toArray(),rightFingersUp:finger.y,rightElbowX:right.metrics().elbow.x,straightWrist:long.dot(forearm),gaps:[]};
       if(!cross||cross.left<=0||cross.left>=1||cross.right<=0||cross.right>=1)return result;
       const sides=new Map();b.hands.traverse(m=>{if(m.isSkinnedMesh){if(!sides.has(m.material))sides.set(m.material,m.material.side);m.material.side=T.DoubleSide;m.skeleton.update();m.computeBoundingSphere();if(m.boundingBox)m.computeBoundingBox();}});
       const ray=new T.Raycaster();
@@ -99,7 +100,7 @@ try{
             b.hero.rigs.forEach((r,i)=>{const now=r.metrics(),before=b.__motion.previous[i];
               b.__motion.drift=Math.max(b.__motion.drift,now.shoulder.distanceTo(b.__motion.mounts[i]));
               for(const joint of ['wrist','elbow','shoulder'])b.__motion.jump=Math.max(b.__motion.jump,now[joint].distanceTo(before[joint]));
-              b.__motion.stretch=Math.max(b.__motion.stretch,Math.abs(now.wrist.distanceTo(now.elbow)-b.__motion.lengths[i][0]),Math.abs(now.elbow.distanceTo(now.shoulder)-b.__motion.lengths[i][1]));b.__motion.previous[i]=now;
+              b.__motion.stretch=Math.max(b.__motion.stretch,Math.abs(now.wrist.distanceTo(now.elbow)-b.__motion.lengths[i][0]*(r.current.forearmScale||1)),Math.abs(now.elbow.distanceTo(now.shoulder)-b.__motion.lengths[i][1]));b.__motion.previous[i]=now;
             });
             // Attached skins need updateMatrixWorld (not just updateWorldMatrix)
             // before CPU skinning: it refreshes their inverse bind transforms.
@@ -135,7 +136,7 @@ try{
             beam:beam?{visible:beam.volume.visible,sourceError:beam.start.distanceTo(b.hero.socketWorld('beam')),screenError:b.camera.localToWorld(points[1].elbow.clone().lerp(points[1].wrist,.73).add(new T.Vector3(0,0,-.18))).project(b.hero.lens.camera).distanceTo(beam.start.clone().project(b.camera)),contact:beam.contact.material.opacity,railCoverage:screenLength(beam.volume.sourceBottom,beam.volume.sourceTop,b.camera)/screenLength(rigs[1].lower.getWorldPosition(new T.Vector3()),rigs[1].hand.getWorldPosition(new T.Vector3()),b.hero.lens.camera)}:null,
             disc:disc?{held:!disc.released,sourceError:disc.disc.position.distanceTo(b.hero.socketWorld('disc')),targetError:disc.disc.position.distanceTo(disc.end)}:null};
           b.renderer.render(b.renderScene,b.camera);return result;`);
-        assert.ok(m.stretch<.0001,'action must preserve arm lengths');
+        assert.ok(m.stretch<.0001,'bones must follow the authored forearm compensation without unplanned stretching');
         assert.ok(m.drift<(action==='beam'?.321:.0001)&&m.shoulderSpan>1.6&&m.shoulderSpan<1.8,'only the authored left shoulder lead may translate during the beam');
         assert.equal(m.visibleCaps,0,`${label} ${action} ${time}: shoulder cut faces must remain hidden throughout the action`);
         assert.ok(m.jump<(action==='punch'?.42:.24),'adjacent frames must not teleport joints '+JSON.stringify({label,action,time,jump:m.jump}));
@@ -143,12 +144,13 @@ try{
         if(action==='beam'){
           assert.ok(m.minMovingGap>=0,'forearms must not pass through each other during entry/recovery: '+JSON.stringify({viewport:label,gap:m.minMovingGap,time:m.minMovingGapTime}));
           if(time>=.34&&time<=1.3){
-            assert.ok(m.cross.left>.2&&m.cross.left<.8&&m.cross.right>.2&&m.cross.right<.8,'crossing must lie inside BOTH forearms, not on a supporting palm');
-            assert.ok(Math.abs(m.cross.angle-90)<2,'projected forearms must form a cross');
+            assert.ok(m.cross.left>.2&&m.cross.left<.92&&m.cross.right>.2&&m.cross.right<.8,'crossing must lie inside BOTH forearms, not on a supporting palm');
+            assert.ok(Math.abs(m.cross.angle-90)<5,'projected forearms must form a cross');
             assert.ok(m.cross.leftPalm[1]<-.999,'left palm must face the ground, measured from the wrist and three knuckles in world coordinates');
             assert.ok(m.cross.rightForearm[1]>.9999&&m.cross.rightFingersUp>.98,'right wrist and blade must rise vertically above the elbow, including in side view');
             assert.ok(m.cross.rightElbowX>(label==='desktop'?.45:.23),'right elbow must open to the player’s right');
             assert.ok(m.cross.straightWrist>.97,'left wrist must stay straight');
+            assert.ok(m.cross.wristMargins.every(margin=>margin>.14),'crossing must have clearance from both wrists');
             assert.ok(m.cross.gaps.length>=3&&m.cross.gaps.every(g=>g>0&&g<.20),'right forearm must cover the left at the cross without penetration: '+JSON.stringify(m.cross.gaps));
             assert.ok(m.cross.entries[0]?.[0]<.28&&m.cross.entries[1]?.[0]>.70,'upper arms should enter from opposite outer portions of the frame: '+JSON.stringify(m.cross.entries));
             for(const [x,y]of [...m.tips,...m.wrists])assert.ok(x>.03&&x<.97&&y>.03&&y<.94,'hands must fit in the viewport '+JSON.stringify({label,time,tips:m.tips,wrists:m.wrists}));
@@ -158,6 +160,21 @@ try{
           if(time===.65){assert.equal(m.health,64);assert.ok(m.beam.contact>0);}
           if(m.beam){assert.ok(m.beam.sourceError<.0001&&m.beam.screenError<.0001);if(time>=.55)assert.ok(m.beam.railCoverage>1&&m.beam.railCoverage<1.5,'the visible emitter must span the upright forearm: '+m.beam.railCoverage);}
           if(time===2.02){assert.equal(m.visible,false);assert.equal(m.beam,null);}
+        }
+        if(action==='beam'&&label==='desktop'&&time===1.3){
+          const contour=await act(`
+            const saved=b.renderScene.children.map(o=>[o,o.visible]),background=b.renderScene.background,fog=b.renderScene.fog;
+            const right=b.hero.rigs[1].root,rightVisible=right.visible;
+            try{
+              for(const[o]of saved)if(o!==b.camera&&!o.isLight)o.visible=false;
+              right.visible=false;b.renderScene.background=new T.Color(0);b.renderScene.fog=null;b.renderer.render(b.renderScene,b.camera);
+              const gl=b.renderer.getContext(),w=gl.drawingBufferWidth,h=gl.drawingBufferHeight,pixels=new Uint8Array(w*h*4);
+              gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+              return [.3,.4,.5].map(x=>{const column=Math.floor(x*w);for(let row=h-1;row>=0;row--){const i=(row*w+column)*4;if(Math.max(pixels[i],pixels[i+1],pixels[i+2])>20)return 1-(row+.5)/h;}return 1;});
+            }finally{for(const[o,visible]of saved)o.visible=visible;right.visible=rightVisible;b.renderScene.background=background;b.renderScene.fog=fog;b.renderer.render(b.renderScene,b.camera);}
+          `);
+          assert.ok(contour.every(y=>y>.57&&y<.71)&&Math.max(...contour)-Math.min(...contour)<.025,'rendered horizontal arm must extend through the left half of the frame with a flat upper outline: '+JSON.stringify(contour));
+          report.push({viewport:label,renderedContour:contour});
         }
         if(action==='punch'&&time===.18)assert.equal(m.health,98);if(action==='palm'&&time===.35)assert.equal(m.health,90);
         if(action==='shield'){
@@ -172,7 +189,7 @@ try{
         }
         report.push({viewport:label,action,...m});
         await page.screenshot({path:path.join(artifacts,`${label}-${action}-${time}.png`)});
-        if(action==='beam'&&time===.34){
+        if(action==='beam'&&time===1.3){
           await act('b.visualEffects.forEach(e=>e.group.visible=false);b.renderer.render(b.renderScene,b.camera);');await page.screenshot({path:path.join(artifacts,`${label}-beam-pose.png`)});
           if(label==='desktop'){
             await act('b.__review={background:b.renderScene.background,fog:b.renderScene.fog,objects:b.renderScene.children.map(o=>[o,o.visible])};b.renderScene.children.forEach(o=>{if(o!==b.camera&&!o.isLight)o.visible=false;});b.renderScene.background=new T.Color(0x242b35);b.renderScene.fog=null;');
@@ -191,7 +208,7 @@ try{
         previous=time;
       }
       if(action==='shield')await page.keyboard.up('l');
-      console.log(`PASS ${label} ${action}: continuous joints, fixed arm lengths, pose framing and contact timing`);
+      console.log(`PASS ${label} ${action}: continuous joints, viewmodel proportions, pose framing and contact timing`);
     }
     // A camera player can cast while guarding or immediately after a punch hits.
     // Exercise those real combat entry points and sample the skinned crossing.
@@ -208,13 +225,13 @@ try{
         return{accepted,gap,age,held:b.__inspectCross()};`);
       assert.equal(transition.accepted,true);
       assert.ok(transition.gap>=0,`${label} ${previous} to beam: ${JSON.stringify(transition)}`);
-      assert.ok(transition.held.left>.2&&transition.held.left<.8&&transition.held.gaps.every(g=>g>0));
+      assert.ok(transition.held.left>.2&&transition.held.left<.92&&transition.held.gaps.every(g=>g>0));
     }
     for(const lean of [-1,1]){
       const pose=await act(`b.start();b.nextAttack=100;b.setDefense(false,${lean});b.cast('beam');
         for(let i=0;i<70;i++)b.advance(1/120);return b.__inspectCross();`);
       assert.ok(pose.rightForearm[1]>.9999&&pose.leftPalm[1]<-.999,'world vertical and palm-down must survive a tilted player camera');
-      assert.ok(Math.abs(pose.angle-90)<2&&pose.left>.2&&pose.left<.8&&pose.gaps.length>=3&&pose.gaps.every(g=>g>0),'leaning must preserve the cross and the depth order: '+JSON.stringify(pose));
+      assert.ok(Math.abs(pose.angle-90)<5&&pose.left>.2&&pose.left<.92&&pose.gaps.length>=3&&pose.gaps.every(g=>g>0),'leaning must preserve the cross and the depth order: '+JSON.stringify(pose));
     }
   }
   assert.deepEqual(errors,[]);

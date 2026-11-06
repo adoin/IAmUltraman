@@ -19,13 +19,13 @@ function frame(forward,normal){
 function state(upper,forearm,normal,preset,handForward=forearm){
   return {upper:upper.normalize(),forearm:frame(forearm,normal),hand:frame(handForward,normal),shape:{[preset]:1}};
 }
-function copyPose(p){return{forearm:p.forearm.clone(),hand:p.hand.clone(),upper:p.upper.clone(),shift:p.shift?.clone()||v(),shape:{...p.shape}};}
+function copyPose(p){return{forearm:p.forearm.clone(),hand:p.hand.clone(),upper:p.upper.clone(),shift:p.shift?.clone()||v(),upperRoll:p.upperRoll||0,forearmScale:p.forearmScale||1,shape:{...p.shape}};}
 function blend(a,b,t){t=ease(t);const shape={};for(const n of shapes)shape[n]=(a.shape[n]||0)*(1-t)+(b.shape[n]||0)*t;
   const swing=q().setFromUnitVectors(a.upper,b.upper);
   const shift=a.shift?.clone()||v(),destination=b.shift||v();
   const retracting=shift.lengthSq()>destination.lengthSq();
   shift.lerp(destination,retracting?Math.min(1,t*3):t);
-  return {forearm:a.forearm.clone().slerp(b.forearm,t),hand:a.hand.clone().slerp(b.hand,t),upper:a.upper.clone().applyQuaternion(q().slerp(swing,t)),shift,shape};
+  return {forearm:a.forearm.clone().slerp(b.forearm,t),hand:a.hand.clone().slerp(b.hand,t),upper:a.upper.clone().applyQuaternion(q().slerp(swing,t)),shift,upperRoll:THREE.MathUtils.lerp(a.upperRoll||0,b.upperRoll||0,t),forearmScale:THREE.MathUtils.lerp(a.forearmScale||1,b.forearmScale||1,t),shape};
 }
 
 class ArmRig {
@@ -33,7 +33,7 @@ class ArmRig {
     this.root=root;this.side=side;this.camera=camera;this.nodes={};this.rest=new Map();this.presets={};
     root.updateWorldMatrix(true,true);
     root.traverse(o=>{if(o.isBone){this.nodes[o.name]=o;this.rest.set(o,o.quaternion.clone());}});
-    const suffix='_'+side;this.upper=this.nodes['UpperArm'+suffix];this.lower=this.nodes['LowerArm'+suffix];this.hand=this.nodes['Hand'+suffix];
+    const suffix='_'+side;this.upper=this.nodes['UpperArm'+suffix];this.lower=this.nodes['LowerArm'+suffix];this.hand=this.nodes['Hand'+suffix];this.handRestPosition=this.hand.position.clone();
     const rootInv=root.getWorldQuaternion(q()).invert();
     this.restUpperQ=rootInv.clone().multiply(this.upper.getWorldQuaternion(q()));
     this.restLowerQ=rootInv.clone().multiply(this.lower.getWorldQuaternion(q()));
@@ -70,6 +70,23 @@ class ArmRig {
     this.tipLocal={};
     for(const finger of [...fingers,'Thumb']){const bone=this.nodes[finger+'3'+suffix];const rootTip=this.tip(finger);this.tipLocal[finger]=bone.worldToLocal(root.localToWorld(rootTip));}
     this.fingerNodes=[...fingers,'Thumb'].flatMap(f=>[1,2,3].map(j=>this.nodes[f+j+suffix]));
+    this.forearmMeshes=[];
+    if(side==='L')root.traverse(mesh=>{
+      if(!mesh.isSkinnedMesh)return;
+      const boneIndex=mesh.skeleton.bones.indexOf(this.lower),g=mesh.geometry,indices=g.attributes.skinIndex,skin=g.attributes.skinWeight;
+      if(boneIndex<0)return;
+      const weights=new Float32Array(g.attributes.position.count),components=['getX','getY','getZ','getW'];
+      for(let i=0;i<weights.length;i++)for(const component of components)if(indices[component](i)===boneIndex)weights[i]+=skin[component](i);
+      if(!weights.some(w=>w>0))return;
+      mesh.geometry=g.clone();const positions=new Float32Array(weights.length*3),normals=new Float32Array(weights.length*3);
+      for(let i=0;i<weights.length;i++)for(let j=0;j<3;j++){positions[i*3+j]=g.attributes.position[components[j]](i);normals[i*3+j]=g.attributes.normal[components[j]](i);}
+      mesh.geometry.setAttribute('position',new THREE.BufferAttribute(positions.slice(),3));mesh.geometry.setAttribute('normal',new THREE.BufferAttribute(normals.slice(),3));
+      const toGeometry=mesh.bindMatrix.clone().invert();
+      const elbow=v().setFromMatrixPosition(mesh.skeleton.boneInverses[boneIndex].clone().invert()).applyMatrix4(toGeometry);
+      const axis=v().setFromMatrixPosition(mesh.skeleton.boneInverses[mesh.skeleton.bones.indexOf(this.hand)].clone().invert()).applyMatrix4(toGeometry).sub(elbow).normalize();
+      this.forearmMeshes.push({mesh,positions,normals,weights,elbow,axis});
+    });
+    this.forearmScale=1;
     this.buildPresets();this.restore();
   }
   point(bone){return this.root.worldToLocal(bone.getWorldPosition(v()));}
@@ -126,18 +143,35 @@ class ArmRig {
     for(const bone of this.fingerNodes){let sum=0,rotation=q();for(const name of shapes){const weight=weights[name]||0;if(weight<.00001)continue;const target=this.presets[name].get(bone);if(sum===0)rotation.copy(target);else rotation.slerp(target,weight/(sum+weight));sum+=weight;}bone.quaternion.copy(sum?rotation:this.rest.get(bone));}
   }
   orient(bone,desiredCameraQ){const world=this.camera.getWorldQuaternion(q()).multiply(desiredCameraQ);bone.quaternion.copy(bone.parent.getWorldQuaternion(q()).invert().multiply(world));bone.updateWorldMatrix(false,true);}
+  fitForearm(scale){
+    if(Math.abs(scale-this.forearmScale)<1e-7)return;
+    this.forearmScale=scale;
+    for(const {mesh,positions,normals,weights,elbow,axis}of this.forearmMeshes){
+      const target=mesh.geometry.attributes.position,normal=mesh.geometry.attributes.normal;
+      for(let i=0;i<weights.length;i++){
+        const j=i*3,along=(positions[j]-elbow.x)*axis.x+(positions[j+1]-elbow.y)*axis.y+(positions[j+2]-elbow.z)*axis.z;
+        const extension=along*(scale-1)*weights[i];
+        target.setXYZ(i,positions[j]+axis.x*extension,positions[j+1]+axis.y*extension,positions[j+2]+axis.z*extension);
+        const tilt=(normals[j]*axis.x+normals[j+1]*axis.y+normals[j+2]*axis.z)*(1-1/scale)*weights[i];
+        const x=normals[j]-axis.x*tilt,y=normals[j+1]-axis.y*tilt,z=normals[j+2]-axis.z*tilt,length=Math.hypot(x,y,z)||1;
+        normal.setXYZ(i,x/length,y/length,z/length);
+      }
+      target.needsUpdate=true;normal.needsUpdate=true;mesh.boundingSphere=null;mesh.boundingBox=null;
+    }
+  }
   apply(pose){
+    const scale=pose.forearmScale||1;this.fitForearm(scale);this.hand.position.copy(this.handRestPosition).multiplyScalar(scale);
     const forward=v(0,1,0).applyQuaternion(pose.forearm),normal=v(0,0,1).applyQuaternion(pose.forearm);
     const mount=this.mount.clone().add(pose.shift||v());
     const elbow=mount.clone().addScaledVector(pose.upper,this.upperLength);
-    const wrist=elbow.clone().addScaledVector(forward,this.lowerLength);
+    const wrist=elbow.clone().addScaledVector(forward,this.lowerLength*scale);
     this.root.quaternion.identity();this.root.scale.setScalar(1);this.root.position.copy(mount).sub(this.shoulder);this.root.updateWorldMatrix(true,true);
     const upperRotation=frame(pose.upper,normal).multiply(this.upperFrame).multiply(this.restUpperQ);
-    this.orient(this.upper,upperRotation);
+    this.orient(this.upper,q().setFromAxisAngle(pose.upper,pose.upperRoll||0).multiply(upperRotation));
     this.orient(this.lower,pose.forearm.clone().multiply(this.lowerFrame).multiply(this.restLowerQ));
     this.orient(this.hand,pose.hand.clone().multiply(this.handFrame).multiply(this.restHandQ));
     this.applyShape(pose.shape);this.root.updateWorldMatrix(true,true);
-    this.current={wrist,elbow,shoulder:mount,forearm:forward,normal,shape:{...pose.shape}};
+    this.current={wrist,elbow,shoulder:mount,forearm:forward,normal,forearmScale:scale,shape:{...pose.shape}};
   }
   metrics(){const cameraPoint=bone=>this.camera.worldToLocal(bone.getWorldPosition(v()));return{wrist:cameraPoint(this.hand),elbow:cameraPoint(this.lower),shoulder:cameraPoint(this.upper)};}
 }
@@ -161,7 +195,7 @@ export class HeroAnimation {
 
     // The eye midpoint and shoulder span come from Tiga's rest mesh. Turn the
     // torso slightly into the stance and allow framing space in front of the
-    // eyes. The beam adds a staged left-shoulder lead after the arm rises.
+    // eyes. The beam fits its horizontal arm after the initial gather.
     const stance=THREE.MathUtils.degToRad(10);
     const vertical=Math.tan(THREE.MathUtils.degToRad(this.lens.camera.fov/2));
     const horizontal=vertical*aspect;
@@ -197,7 +231,8 @@ export class HeroAnimation {
 
   beamPose(up,lead=1){
     const [left,right]=this.rigs;
-    const shoulderShift=v(0,THREE.MathUtils.lerp(.25,.08,this.narrow),-THREE.MathUtils.lerp(.2,.04,this.narrow)).multiplyScalar(lead);
+    const responsive=clamp((this.aspect-1.2)/.3,0,1);
+    const shoulderShift=v(0,THREE.MathUtils.lerp(.25,.08,this.narrow),-THREE.MathUtils.lerp(.2,.04,this.narrow)).multiplyScalar(lead*(1-clamp((this.aspect-.9)/.3,0,1)));
     const leftMount=left.mount.clone().add(shoulderShift);
     const mix=(wide,narrow)=>THREE.MathUtils.lerp(wide,narrow,this.narrow);
     const side=v(1,0,0).addScaledVector(up,-up.x).normalize();
@@ -216,7 +251,7 @@ export class HeroAnimation {
 
     // The horizontal forearm passes on the monster side of the right one.
     // Both centerlines project through one crossing, with room for the skin.
-    const separation=mix(.33,.41);
+    const separation=mix(.33,.41)-.06*lead*responsive;
     const farCross=nearCross.clone().multiplyScalar(1+separation/-nearCross.z);
     const offset=farCross.clone().sub(leftMount);
     // Back-project the horizontal stroke of the cross into a plane through
@@ -242,12 +277,34 @@ export class HeroAnimation {
     const toCross=along-Math.sqrt(Math.max(0,radius**2-distance**2+along**2));
     const leftElbow=farCross.clone().addScaledVector(across,-toCross);
     const handAcross=across.clone().addScaledVector(up,-across.dot(up)).normalize();
-    const horizontal=state(leftElbow.sub(leftMount),across,up,'blade',handAcross);
+    const horizontal=state(leftElbow.clone().sub(leftMount),across,up,'blade',handAcross);
     horizontal.shift=shoulderShift;
     const upright=state(elbow.sub(right.mount),up,side,'blade');
     horizontal.hand.multiply(left.palmAlignment);
     upright.hand.multiply(right.palmAlignment);
-    return [horizontal,upright];
+    // Fit the elbow and wrist to the illustrated first-person silhouette.
+    // Compensate sleeve length along the forearm axis and preserve hand size.
+    const wide=lead*clamp((this.aspect-1.2)/.3,0,1);
+    if(wide===0)return [horizontal,upright];
+    const mount=left.mount.clone().add(shoulderShift.clone().lerp(v(0,-.15*lead,0),responsive));
+    const viewTangent=Math.tan(THREE.MathUtils.degToRad(this.lens.camera.fov/2));
+    const targetX=.5-.388/this.aspect;
+    const x=THREE.MathUtils.lerp(leftElbow.x/-leftElbow.z,(targetX*2-1)*viewTangent*this.aspect,wide);
+    // Lower the elbow slightly to level the tapered sleeve outline.
+    const ray=v(x,(plane.z-plane.x*x)/plane.y-.052*viewTangent*wide,-1);
+    const projection=ray.dot(mount),discriminant=projection**2-ray.lengthSq()*(mount.lengthSq()-left.upperLength**2);
+    if(discriminant<=0)return [horizontal,upright];
+    const depth=(projection+Math.sqrt(Math.max(0,discriminant)))/ray.lengthSq();
+    const elbowTarget=ray.multiplyScalar(depth),direction=farCross.clone().sub(elbowTarget).normalize();
+    const oldWrist=leftElbow.clone().addScaledVector(across,left.lowerLength);
+    const wristSlope=THREE.MathUtils.lerp(oldWrist.x/-oldWrist.z,.6156*viewTangent,wide);
+    const length=(-wristSlope*elbowTarget.z-elbowTarget.x)/(direction.x+wristSlope*direction.z);
+    const palmDirection=direction.clone().addScaledVector(up,-direction.dot(up)).normalize();
+    const fitted=state(elbowTarget.clone().sub(mount),direction,up,'blade',palmDirection);
+    fitted.hand.multiply(left.palmAlignment);fitted.shift=mount.sub(left.mount);
+    fitted.upperRoll=THREE.MathUtils.degToRad(70)*wide;
+    fitted.forearmScale=length/left.lowerLength;
+    return [fitted,upright];
   }
 
   punchPose(side,extended){
@@ -296,7 +353,8 @@ export class HeroAnimation {
         const phase=t/BEAM_TIMING.ready;
         target=[blend(this.entry[0],this.beamBase[0],(phase-.15)/.85),blend(this.entry[1],this.beamBase[1],phase/.76)];
       }else if(t<BEAM_TIMING.lightEnd){
-        target=this.beamBase.map((pose,i)=>blend(pose,this.beam[i],(t-BEAM_TIMING.ready)/.12));
+        const lead=clamp((t-BEAM_TIMING.ready)/.12,0,1);
+        target=lead<1?this.beamPose(this.beamUp,lead):this.beam;
       }else{
         const phase=(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd);
         target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
@@ -346,5 +404,5 @@ export class HeroAnimation {
     return [right.elbow.clone().addScaledVector(axis,.14),right.wrist.clone().addScaledVector(axis,.54)].map(point=>this.lens.effectPoint(point.add(v(0,0,-.18))));
   }
   poseHand(index,preset){const rig=this.rigs[index];rig.applyShape({[preset]:1});rig.root.updateWorldMatrix(true,true);}
-  diagnostics(){return this.rigs.map(r=>{const m=r.metrics();return{side:r.side,wrist:m.wrist.toArray(),elbow:m.elbow.toArray(),shoulder:m.shoulder.toArray(),forearmLength:m.wrist.distanceTo(m.elbow),upperLength:m.elbow.distanceTo(m.shoulder),shape:r.current.shape};});}
+  diagnostics(){return this.rigs.map(r=>{const m=r.metrics();return{side:r.side,wrist:m.wrist.toArray(),elbow:m.elbow.toArray(),shoulder:m.shoulder.toArray(),forearmLength:m.wrist.distanceTo(m.elbow),upperLength:m.elbow.distanceTo(m.shoulder),forearmScale:r.current.forearmScale,shape:r.current.shape};});}
 }
