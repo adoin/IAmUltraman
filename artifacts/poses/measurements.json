@@ -1,0 +1,1046 @@
+{
+ "threshold": {
+  "idle": 0.1,
+  "pair": 0.07
+ },
+ "rows": [
+  {
+   "model": "baltan",
+   "kind": "bolt",
+   "name": "白色破坏光弹",
+   "idleWindup": 0.609,
+   "idleFlight": 0.593
+  },
+  {
+   "model": "baltan",
+   "kind": "charge",
+   "name": "分身突进",
+   "idleWindup": 0.354,
+   "idleFlight": 0.386
+  },
+  {
+   "model": "baltan",
+   "kind": "sweep",
+   "name": "冷冻光线",
+   "idleWindup": 0.744,
+   "idleFlight": 0.697
+  },
+  {
+   "model": "baltan",
+   "kind": "melee",
+   "name": "巴尔坦钳爪突刺",
+   "idleWindup": 0.499,
+   "idleFlight": 0.329
+  },
+  {
+   "model": "mefilas",
+   "kind": "sweep",
+   "name": "念力波动",
+   "idleWindup": 0.527,
+   "idleFlight": 0.553
+  },
+  {
+   "model": "mefilas",
+   "kind": "bolt",
+   "name": "美菲拉斯光弹",
+   "idleWindup": 0.577,
+   "idleFlight": 0.581
+  },
+  {
+   "model": "mefilas",
+   "kind": "charge",
+   "name": "瞬间移动",
+   "idleWindup": 0.179,
+   "idleFlight": 0.226
+  },
+  {
+   "model": "mefilas",
+   "kind": "melee",
+   "name": "怪力直拳",
+   "idleWindup": 0.313,
+   "idleFlight": 0.374
+  },
+  {
+   "model": "chaos-seven",
+   "kind": "bolt",
+   "name": "艾梅利姆光线",
+   "idleWindup": 0.548,
+   "idleFlight": 0.465
+  },
+  {
+   "model": "chaos-seven",
+   "kind": "sweep",
+   "name": "头镖飞旋",
+   "idleWindup": 0.71,
+   "idleFlight": 0.628
+  },
+  {
+   "model": "chaos-seven",
+   "kind": "charge",
+   "name": "暗影突进",
+   "idleWindup": 0.377,
+   "idleFlight": 0.419
+  },
+  {
+   "model": "chaos-seven",
+   "kind": "melee",
+   "name": "赛文式连击",
+   "idleWindup": 0.544,
+   "idleFlight": 0.575
+  },
+  {
+   "model": "chaos-taro",
+   "kind": "sweep",
+   "name": "新斯特利姆光线",
+   "idleWindup": 0.591,
+   "idleFlight": 0.506
+  },
+  {
+   "model": "chaos-taro",
+   "kind": "bolt",
+   "name": "斯特利姆光线",
+   "idleWindup": 0.581,
+   "idleFlight": 0.54
+  },
+  {
+   "model": "chaos-taro",
+   "kind": "charge",
+   "name": "王者冲锋",
+   "idleWindup": 0.255,
+   "idleFlight": 0.293
+  },
+  {
+   "model": "chaos-taro",
+   "kind": "melee",
+   "name": "燕式踢",
+   "idleWindup": 0.591,
+   "idleFlight": 0.592
+  },
+  {
+   "model": "chaos-ultraman",
+   "kind": "bolt",
+   "name": "卡欧斯斯派修姆光线",
+   "idleWindup": 0.563,
+   "idleFlight": 0.751
+  },
+  {
+   "model": "chaos-ultraman",
+   "kind": "charge",
+   "name": "高速突进",
+   "idleWindup": 0.164,
+   "idleFlight": 0.202
+  },
+  {
+   "model": "chaos-ultraman",
+   "kind": "sweep",
+   "name": "卡欧斯光轮",
+   "idleWindup": 0.56,
+   "idleFlight": 0.467
+  },
+  {
+   "model": "chaos-ultraman",
+   "kind": "melee",
+   "name": "奥特拳",
+   "idleWindup": 0.292,
+   "idleFlight": 0.326
+  },
+  {
+   "model": "zetton",
+   "kind": "bolt",
+   "name": "一兆度火球",
+   "idleWindup": 0.703,
+   "idleFlight": 0.433
+  },
+  {
+   "model": "zetton",
+   "kind": "sweep",
+   "name": "杰顿光线",
+   "idleWindup": 0.725,
+   "idleFlight": 0.653
+  },
+  {
+   "model": "zetton",
+   "kind": "charge",
+   "name": "瞬间移动",
+   "idleWindup": 0.228,
+   "idleFlight": 0.278
+  },
+  {
+   "model": "zetton",
+   "kind": "melee",
+   "name": "能量拳",
+   "idleWindup": 0.209,
+   "idleFlight": 0.38
+  },
+  {
+   "model": "gomora-mecha",
+   "kind": "sweep",
+   "name": "超振动波",
+   "idleWindup": 0.301,
+   "idleFlight": 0.429
+  },
+  {
+   "model": "gomora-mecha",
+   "kind": "slam",
+   "name": "大地踏击",
+   "idleWindup": 0.753,
+   "idleFlight": 0.499
+  },
+  {
+   "model": "gomora-mecha",
+   "kind": "bolt",
+   "name": "机械光弹",
+   "idleWindup": 0.462,
+   "idleFlight": 0.446
+  },
+  {
+   "model": "gomora-mecha",
+   "kind": "melee",
+   "name": "机械重拳",
+   "idleWindup": 0.563,
+   "idleFlight": 0.454
+  },
+  {
+   "model": "galactron",
+   "kind": "sweep",
+   "name": "重力冲击波",
+   "idleWindup": 0.167,
+   "idleFlight": 0.23
+  },
+  {
+   "model": "galactron",
+   "kind": "bolt",
+   "name": "迦拉克隆光线",
+   "idleWindup": 0.555,
+   "idleFlight": 0.554
+  },
+  {
+   "model": "galactron",
+   "kind": "slam",
+   "name": "巨体重压",
+   "idleWindup": 0.674,
+   "idleFlight": 0.467
+  },
+  {
+   "model": "galactron",
+   "kind": "melee",
+   "name": "腕刃斩击",
+   "idleWindup": 0.458,
+   "idleFlight": 0.46
+  },
+  {
+   "model": "gatanothor",
+   "kind": "slam",
+   "name": "触手砸击",
+   "idleWindup": 0.754,
+   "idleFlight": 0.426
+  },
+  {
+   "model": "gatanothor",
+   "kind": "sweep",
+   "name": "触手横扫",
+   "idleWindup": 0.542,
+   "idleFlight": 0.597
+  },
+  {
+   "model": "gatanothor",
+   "kind": "bolt",
+   "name": "怪光线",
+   "idleWindup": 0.614,
+   "idleFlight": 0.594
+  },
+  {
+   "model": "gatanothor",
+   "kind": "charge",
+   "name": "黑暗突进",
+   "idleWindup": 0.227,
+   "idleFlight": 0.273
+  },
+  {
+   "model": "gatanothor",
+   "kind": "melee",
+   "name": "大镰重击",
+   "idleWindup": 0.425,
+   "idleFlight": 0.433
+  }
+ ],
+ "pairs": [
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "mefilas",
+   "windup": 0.265,
+   "flight": 0.197
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "chaos-seven",
+   "windup": 0.512,
+   "flight": 0.473
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "chaos-taro",
+   "windup": 0.667,
+   "flight": 0.206
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "chaos-ultraman",
+   "windup": 0.319,
+   "flight": 0.498
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "zetton",
+   "windup": 0.292,
+   "flight": 0.336
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "gomora-mecha",
+   "windup": 0.533,
+   "flight": 0.511
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "galactron",
+   "windup": 0.33,
+   "flight": 0.377
+  },
+  {
+   "kind": "bolt",
+   "a": "baltan",
+   "b": "gatanothor",
+   "windup": 0.171,
+   "flight": 0.268
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "chaos-seven",
+   "windup": 0.485,
+   "flight": 0.437
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "chaos-taro",
+   "windup": 0.529,
+   "flight": 0.21
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "chaos-ultraman",
+   "windup": 0.447,
+   "flight": 0.448
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "zetton",
+   "windup": 0.227,
+   "flight": 0.328
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "gomora-mecha",
+   "windup": 0.482,
+   "flight": 0.484
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "galactron",
+   "windup": 0.437,
+   "flight": 0.42
+  },
+  {
+   "kind": "bolt",
+   "a": "mefilas",
+   "b": "gatanothor",
+   "windup": 0.245,
+   "flight": 0.329
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-seven",
+   "b": "chaos-taro",
+   "windup": 0.56,
+   "flight": 0.452
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-seven",
+   "b": "chaos-ultraman",
+   "windup": 0.519,
+   "flight": 0.582
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-seven",
+   "b": "zetton",
+   "windup": 0.5,
+   "flight": 0.543
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-seven",
+   "b": "gomora-mecha",
+   "windup": 0.361,
+   "flight": 0.267
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-seven",
+   "b": "galactron",
+   "windup": 0.526,
+   "flight": 0.528
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-seven",
+   "b": "gatanothor",
+   "windup": 0.507,
+   "flight": 0.518
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-taro",
+   "b": "chaos-ultraman",
+   "windup": 0.762,
+   "flight": 0.563
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-taro",
+   "b": "zetton",
+   "windup": 0.504,
+   "flight": 0.228
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-taro",
+   "b": "gomora-mecha",
+   "windup": 0.605,
+   "flight": 0.47
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-taro",
+   "b": "galactron",
+   "windup": 0.757,
+   "flight": 0.251
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-taro",
+   "b": "gatanothor",
+   "windup": 0.659,
+   "flight": 0.186
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-ultraman",
+   "b": "zetton",
+   "windup": 0.475,
+   "flight": 0.644
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-ultraman",
+   "b": "gomora-mecha",
+   "windup": 0.57,
+   "flight": 0.665
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-ultraman",
+   "b": "galactron",
+   "windup": 0.157,
+   "flight": 0.644
+  },
+  {
+   "kind": "bolt",
+   "a": "chaos-ultraman",
+   "b": "gatanothor",
+   "windup": 0.305,
+   "flight": 0.574
+  },
+  {
+   "kind": "bolt",
+   "a": "zetton",
+   "b": "gomora-mecha",
+   "windup": 0.545,
+   "flight": 0.558
+  },
+  {
+   "kind": "bolt",
+   "a": "zetton",
+   "b": "galactron",
+   "windup": 0.478,
+   "flight": 0.322
+  },
+  {
+   "kind": "bolt",
+   "a": "zetton",
+   "b": "gatanothor",
+   "windup": 0.273,
+   "flight": 0.32
+  },
+  {
+   "kind": "bolt",
+   "a": "gomora-mecha",
+   "b": "galactron",
+   "windup": 0.508,
+   "flight": 0.476
+  },
+  {
+   "kind": "bolt",
+   "a": "gomora-mecha",
+   "b": "gatanothor",
+   "windup": 0.479,
+   "flight": 0.472
+  },
+  {
+   "kind": "bolt",
+   "a": "galactron",
+   "b": "gatanothor",
+   "windup": 0.263,
+   "flight": 0.156
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "mefilas",
+   "windup": 0.437,
+   "flight": 0.419
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "chaos-seven",
+   "windup": 0.251,
+   "flight": 0.4
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "chaos-taro",
+   "windup": 0.504,
+   "flight": 0.542
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "chaos-ultraman",
+   "windup": 0.537,
+   "flight": 0.546
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "zetton",
+   "windup": 0.201,
+   "flight": 0.309
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "gomora-mecha",
+   "windup": 0.694,
+   "flight": 0.594
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "galactron",
+   "windup": 0.735,
+   "flight": 0.672
+  },
+  {
+   "kind": "sweep",
+   "a": "baltan",
+   "b": "gatanothor",
+   "windup": 0.476,
+   "flight": 0.286
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "chaos-seven",
+   "windup": 0.377,
+   "flight": 0.174
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "chaos-taro",
+   "windup": 0.498,
+   "flight": 0.338
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "chaos-ultraman",
+   "windup": 0.494,
+   "flight": 0.32
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "zetton",
+   "windup": 0.376,
+   "flight": 0.341
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "gomora-mecha",
+   "windup": 0.419,
+   "flight": 0.309
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "galactron",
+   "windup": 0.466,
+   "flight": 0.438
+  },
+  {
+   "kind": "sweep",
+   "a": "mefilas",
+   "b": "gatanothor",
+   "windup": 0.319,
+   "flight": 0.398
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-seven",
+   "b": "chaos-taro",
+   "windup": 0.334,
+   "flight": 0.379
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-seven",
+   "b": "chaos-ultraman",
+   "windup": 0.406,
+   "flight": 0.369
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-seven",
+   "b": "zetton",
+   "windup": 0.152,
+   "flight": 0.327
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-seven",
+   "b": "gomora-mecha",
+   "windup": 0.663,
+   "flight": 0.399
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-seven",
+   "b": "galactron",
+   "windup": 0.689,
+   "flight": 0.535
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-seven",
+   "b": "gatanothor",
+   "windup": 0.484,
+   "flight": 0.429
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-taro",
+   "b": "chaos-ultraman",
+   "windup": 0.16,
+   "flight": 0.146
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-taro",
+   "b": "zetton",
+   "windup": 0.441,
+   "flight": 0.428
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-taro",
+   "b": "gomora-mecha",
+   "windup": 0.625,
+   "flight": 0.431
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-taro",
+   "b": "galactron",
+   "windup": 0.608,
+   "flight": 0.461
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-taro",
+   "b": "gatanothor",
+   "windup": 0.641,
+   "flight": 0.585
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-ultraman",
+   "b": "zetton",
+   "windup": 0.494,
+   "flight": 0.372
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-ultraman",
+   "b": "gomora-mecha",
+   "windup": 0.579,
+   "flight": 0.429
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-ultraman",
+   "b": "galactron",
+   "windup": 0.569,
+   "flight": 0.427
+  },
+  {
+   "kind": "sweep",
+   "a": "chaos-ultraman",
+   "b": "gatanothor",
+   "windup": 0.679,
+   "flight": 0.547
+  },
+  {
+   "kind": "sweep",
+   "a": "zetton",
+   "b": "gomora-mecha",
+   "windup": 0.675,
+   "flight": 0.557
+  },
+  {
+   "kind": "sweep",
+   "a": "zetton",
+   "b": "galactron",
+   "windup": 0.703,
+   "flight": 0.612
+  },
+  {
+   "kind": "sweep",
+   "a": "zetton",
+   "b": "gatanothor",
+   "windup": 0.421,
+   "flight": 0.355
+  },
+  {
+   "kind": "sweep",
+   "a": "gomora-mecha",
+   "b": "galactron",
+   "windup": 0.169,
+   "flight": 0.263
+  },
+  {
+   "kind": "sweep",
+   "a": "gomora-mecha",
+   "b": "gatanothor",
+   "windup": 0.476,
+   "flight": 0.484
+  },
+  {
+   "kind": "sweep",
+   "a": "galactron",
+   "b": "gatanothor",
+   "windup": 0.5,
+   "flight": 0.533
+  },
+  {
+   "kind": "slam",
+   "a": "gomora-mecha",
+   "b": "galactron",
+   "windup": 0.227,
+   "flight": 0.203
+  },
+  {
+   "kind": "slam",
+   "a": "gomora-mecha",
+   "b": "gatanothor",
+   "windup": 0.123,
+   "flight": 0.186
+  },
+  {
+   "kind": "slam",
+   "a": "galactron",
+   "b": "gatanothor",
+   "windup": 0.253,
+   "flight": 0.238
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "mefilas",
+   "windup": 0.439,
+   "flight": 0.227
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "chaos-seven",
+   "windup": 0.197,
+   "flight": 0.431
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "chaos-taro",
+   "windup": 0.434,
+   "flight": 0.486
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "chaos-ultraman",
+   "windup": 0.466,
+   "flight": 0.241
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "zetton",
+   "windup": 0.429,
+   "flight": 0.232
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "gomora-mecha",
+   "windup": 0.693,
+   "flight": 0.417
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "galactron",
+   "windup": 0.649,
+   "flight": 0.4
+  },
+  {
+   "kind": "melee",
+   "a": "baltan",
+   "b": "gatanothor",
+   "windup": 0.572,
+   "flight": 0.325
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "chaos-seven",
+   "windup": 0.46,
+   "flight": 0.451
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "chaos-taro",
+   "windup": 0.391,
+   "flight": 0.436
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "chaos-ultraman",
+   "windup": 0.078,
+   "flight": 0.078
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "zetton",
+   "windup": 0.158,
+   "flight": 0.097
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "gomora-mecha",
+   "windup": 0.517,
+   "flight": 0.341
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "galactron",
+   "windup": 0.51,
+   "flight": 0.297
+  },
+  {
+   "kind": "melee",
+   "a": "mefilas",
+   "b": "gatanothor",
+   "windup": 0.322,
+   "flight": 0.191
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-seven",
+   "b": "chaos-taro",
+   "windup": 0.422,
+   "flight": 0.467
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-seven",
+   "b": "chaos-ultraman",
+   "windup": 0.484,
+   "flight": 0.482
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-seven",
+   "b": "zetton",
+   "windup": 0.469,
+   "flight": 0.463
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-seven",
+   "b": "gomora-mecha",
+   "windup": 0.699,
+   "flight": 0.569
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-seven",
+   "b": "galactron",
+   "windup": 0.672,
+   "flight": 0.556
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-seven",
+   "b": "gatanothor",
+   "windup": 0.59,
+   "flight": 0.507
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-taro",
+   "b": "chaos-ultraman",
+   "windup": 0.447,
+   "flight": 0.48
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-taro",
+   "b": "zetton",
+   "windup": 0.496,
+   "flight": 0.498
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-taro",
+   "b": "gomora-mecha",
+   "windup": 0.531,
+   "flight": 0.619
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-taro",
+   "b": "galactron",
+   "windup": 0.649,
+   "flight": 0.586
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-taro",
+   "b": "gatanothor",
+   "windup": 0.363,
+   "flight": 0.44
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-ultraman",
+   "b": "zetton",
+   "windup": 0.147,
+   "flight": 0.115
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-ultraman",
+   "b": "gomora-mecha",
+   "windup": 0.514,
+   "flight": 0.349
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-ultraman",
+   "b": "galactron",
+   "windup": 0.482,
+   "flight": 0.301
+  },
+  {
+   "kind": "melee",
+   "a": "chaos-ultraman",
+   "b": "gatanothor",
+   "windup": 0.356,
+   "flight": 0.214
+  },
+  {
+   "kind": "melee",
+   "a": "zetton",
+   "b": "gomora-mecha",
+   "windup": 0.557,
+   "flight": 0.291
+  },
+  {
+   "kind": "melee",
+   "a": "zetton",
+   "b": "galactron",
+   "windup": 0.464,
+   "flight": 0.236
+  },
+  {
+   "kind": "melee",
+   "a": "zetton",
+   "b": "gatanothor",
+   "windup": 0.402,
+   "flight": 0.214
+  },
+  {
+   "kind": "melee",
+   "a": "gomora-mecha",
+   "b": "galactron",
+   "windup": 0.351,
+   "flight": 0.149
+  },
+  {
+   "kind": "melee",
+   "a": "gomora-mecha",
+   "b": "gatanothor",
+   "windup": 0.383,
+   "flight": 0.278
+  },
+  {
+   "kind": "melee",
+   "a": "galactron",
+   "b": "gatanothor",
+   "windup": 0.542,
+   "flight": 0.262
+  }
+ ]
+}

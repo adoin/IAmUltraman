@@ -1,4 +1,4 @@
-﻿import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
+﻿import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming} from './action-timing.js';
 export const WAVES = [
   {name:'雷德王',model:'redking',title:'海湾入侵者',hp:110,color:0xffcb7a,attacks:['bolt','charge','slam']},
   {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:210,color:0x68d9ff,attacks:['bolt','charge','sweep']},
@@ -8,27 +8,27 @@ export const WAVES = [
   {name:'卡欧斯 · 泰罗',model:'chaos-taro',title:'暗之王冠',hp:285,color:0xff9a7b,attacks:['sweep','bolt','charge']},
   {name:'卡欧斯 · 奥特曼',model:'chaos-ultraman',title:'光之逆影',hp:305,color:0xc7a6ff,attacks:['bolt','charge','sweep']},
   {name:'杰顿',model:'zetton',title:'宇宙恐龙',hp:400,color:0xff7a5c,attacks:['bolt','sweep','charge']},
-  {name:'机械哥莫拉',model:'gomora-mecha',title:'钢铁咆哮',hp:340,color:0xffb066,attacks:['slam','bolt','charge']},
+  {name:'机械哥莫拉',model:'gomora-mecha',title:'钢铁咆哮',hp:340,color:0xffb066,attacks:['sweep','slam','bolt']},
   {name:'迦拉克隆',model:'galactron',title:'光之要塞',hp:440,color:0x7fe7ff,attacks:['sweep','bolt','slam']},
   {name:'加坦杰厄',model:'gatanothor',title:'暗黑支配者',hp:560,color:0x9a8cff,attacks:['slam','sweep','bolt','charge']},
 ];
-export const SKILLS={palm:{cooldown:2.2,damage:14,impact:.34,duration:.72},beam:{cooldown:6.5,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},zepellion:{cooldown:9,damage:82,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},disc:{cooldown:2,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
+export const SKILLS={palm:{cooldown:2.2,damage:14,impact:.34,duration:.72},beam:{cooldown:6.5,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},zepellion:{cooldown:9,damage:82,impact:ZEPELLION_TIMING.impact,duration:ZEPELLION_TIMING.end},disc:{cooldown:2,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
 export const PUNCH={cooldown:.28,damage:12,impact:.18,duration:.36};
 export const SHIELD=Object.freeze({duration:2,cooldown:4,drain:10,recharge:14,blockCost:12});
 /** The final monster defeat hands the screen to the victory dance before results. */
 export const CELEBRATION=Object.freeze({duration:7.5});
 export const MONSTER_ATTACK_NAMES={
   redking:{bolt:'岩石投掷',slam:'震地跺脚',melee:'近身直拳',charge:'蛮力冲锋'},
-  baltan:{bolt:'钳爪光弹',sweep:'钳爪光线',melee:'钳爪突刺',charge:'幻影突进'},
+  baltan:{bolt:'白色破坏光弹',sweep:'冷冻光线',melee:'巴尔坦钳爪突刺',charge:'分身突进'},
   ganq:{bolt:'巨眼光弹',sweep:'巨眼射线',melee:'巨眼撞击',charge:'巨眼突进'},
-  mefilas:{bolt:'星人光弹',sweep:'星人射线',melee:'星人直拳',charge:'瞬移突进'},
-  'chaos-seven':{bolt:'艾梅利姆光弹',sweep:'头镖横扫',melee:'暗影格斗拳',charge:'暗影突进'},
-  'chaos-taro':{bolt:'宇宙光弹',sweep:'王者射线',melee:'宇宙拳击',charge:'王冠冲锋'},
-  'chaos-ultraman':{bolt:'斯派修姆光弹',sweep:'逆光斯派修姆',melee:'奥特拳',charge:'高速突进'},
-  'gomora-mecha':{bolt:'机械光线',sweep:'超振动波',melee:'机械重拳',charge:'蛮力冲锋'},
-  zetton:{bolt:'一兆度火球',sweep:'杰顿光线',melee:'能量拳',charge:'瞬移突进'},
-  galactron:{bolt:'迦拉克隆光线',sweep:'重力冲击波',melee:'巨体重击',charge:'暴走冲锋'},
-  gatanothor:{bolt:'暗黑光弹',sweep:'触手横扫',melee:'巨钳重击',charge:'黑暗突进'},
+  mefilas:{bolt:'美菲拉斯光弹',sweep:'念力波动',melee:'怪力直拳',charge:'瞬间移动'},
+  'chaos-seven':{bolt:'艾梅利姆光线',sweep:'头镖飞旋',melee:'赛文式连击',charge:'暗影突进'},
+  'chaos-taro':{bolt:'斯特利姆光线',sweep:'新斯特利姆光线',melee:'燕式踢',charge:'王者冲锋'},
+  'chaos-ultraman':{bolt:'卡欧斯斯派修姆光线',sweep:'卡欧斯光轮',melee:'奥特拳',charge:'高速突进'},
+  'gomora-mecha':{bolt:'机械光弹',sweep:'超振动波',slam:'大地踏击',melee:'机械重拳',charge:'蛮力突进'},
+  zetton:{bolt:'一兆度火球',sweep:'杰顿光线',melee:'能量拳',charge:'瞬间移动'},
+  galactron:{bolt:'迦拉克隆光线',sweep:'重力冲击波',slam:'巨体重压',melee:'腕刃斩击',charge:'暴走冲锋'},
+  gatanothor:{bolt:'怪光线',sweep:'触手横扫',slam:'触手砸击',melee:'大镰重击',charge:'黑暗突进'},
 };
 export const ATTACKS={
   melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:1.0,flight:.3},

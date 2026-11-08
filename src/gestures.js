@@ -1,3 +1,5 @@
+﻿// Dwell times (ms) live here so the tests can prove a stronger pose costs more.
+export const POSE_HOLDS = Object.freeze({beamEasy:420,beamNormal:600,zepellionEasy:700,zepellionNormal:950,gatherEasy:260,gatherNormal:340});
 const length = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 const visible = p => p && (p.visibility ?? 1) > .45 && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -14,7 +16,7 @@ function segmentsCross(a,b,c,d){
 /** Geometry uses image pixels (not normalized x/y) to preserve angles at any aspect ratio. */
 export class GestureRecognizer {
   constructor(){this.mode='easy';this.reset();}
-  reset(){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.lSince=null;this.lFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
+  reset(){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.lSince=null;this.lFired=false;this.gatherSince=null;this.gatherAt=null;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
   /**
    * One arm pushed forward, the other resting at the waist. Depth alone is
    * noisy on cheap webcams, so a foreshortened straight arm (short 2D reach with
@@ -36,7 +38,7 @@ export class GestureRecognizer {
     return straight&&aimed&&pushed&&spare;
   }
   update(points,time,width=640,height=480){
-    const out={skill:null,skillSide:null,discPreparation:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；胸前十字＝梅特里姆光线，手臂摆成 L＝哉佩利敖光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,debug:{}};
+    const out={skill:null,skillSide:null,discPreparation:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；胸前十字＝梅特里姆光线，手臂摆成 L＝哉佩利敖光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,zepellionStage:0,debug:{}};
     if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>900)) this.reset();
     this.lastTime=time;
     if(!points) return this.lost(out);
@@ -91,17 +93,36 @@ export class GestureRecognizer {
       // instead of restarting the whole dwell on one noisy frame.
       out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='保持前推，别松手…';
     }else{this.palmSince=null;this.palmFired=false;}
-    const hold=easy?420:600;
-    out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,l:zepellionPose,armed:this.armed.some(Boolean)};
+    const hold=easy?POSE_HOLDS.beamEasy:POSE_HOLDS.beamNormal;
+    // Stage 1 of the Zepellion pre-motion: both palms drawn together in front of
+    // the chest. Tiga gathers first, then forms the L; the ray only fires when
+    // the gather happened shortly before the L is complete.
+    const clasp=length(lw,rw)/scale<(easy?.55:.42);
+    const centered=Math.abs((lw.x+rw.x)/2-(ls.x+rs.x)/2)/scale<(easy?.4:.3);
+    const gatherPose=!guardPose&&!oneEach&&!palmArm&&clasp&&centered&&chest;
+    const gatherHold=easy?POSE_HOLDS.gatherEasy:POSE_HOLDS.gatherNormal;
+    if(gatherPose){
+      this.gatherSince??=time;
+      if(time-this.gatherSince>=gatherHold&&this.gatherAt===null)this.gatherAt=time;
+      out.status=this.gatherAt!==null?'聚气完成！把两条小臂摆成 L 形':'双手在胸前合拢，聚气…';
+      if(this.gatherAt===null)out.charge=clamp((time-this.gatherSince)/gatherHold,0,1);
+    }else this.gatherSince=null;
+    const gathered=this.gatherAt!==null&&time-this.gatherAt<=1600;
+    out.zepellionStage=zepellionPose&&gathered?2:gathered?1:0;
+    out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,l:zepellionPose,gather:this.gatherAt!==null,stage:out.zepellionStage,armed:this.armed.some(Boolean)};
     if(palmInfo)out.debug.palm=palmInfo;
     if(zepellionPose&&!guardPose){
       // Tiga's finish: both forearms meet in an L, the vertical one outside the
       // horizontal one, so the arms never cross like the Mebium "+" pose.
       this.lSince??=time;
-      const lHold=easy?700:850;
+      const lHold=easy?POSE_HOLDS.zepellionEasy:POSE_HOLDS.zepellionNormal;
       out.charge=clamp((time-this.lSince)/lHold,0,1);
-      out.status='手臂摆成 L 形，凝聚哉佩利敖光线…';
-      if(out.charge>=1&&!this.lFired){out.skill='zepellion';out.skillSide='right';this.lFired=true;this.raise=[null,null];this.armed=[null,null];}
+      out.status=gathered?'L 形成形，凝聚哉佩利敖光线…':'先双手在胸前合拢聚气，再摆 L 形';
+      if(out.charge>=1&&!this.lFired){
+        if(gathered){
+          out.skill='zepellion';out.skillSide='right';this.lFired=true;this.gatherAt=null;this.raise=[null,null];this.armed=[null,null];
+        }else if(!gathered&&this.gatherAt===null)out.status='还差聚气：先双手在胸前合拢';
+      }
       if(this.lFired)out.status='哉佩利敖光线！放下双手，再来一次';
     }else{this.lSince=null;this.lFired=false;}
     if(cross&&!guardPose){

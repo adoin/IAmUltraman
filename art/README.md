@@ -107,6 +107,12 @@ $env:BLENDER_USER_SCRIPTS = 'PATH/mmd_scripts'
 
 当前使用（全部带骨骼）：`Baltan.pmd` → `baltan.glb`（第 2 波，31 根骨；同包的 Basic / Powered / Mecha Baltan 已不再使用，只保留这一只）、`Alien Mefilas.pmd` → `mefilas.glb`（第 4 波，54 根骨）、`Ultraseven.pmd` → `chaos-seven.glb`（第 5 波）、`Ultraman Taro.pmd` → `chaos-taro.glb`（第 6 波）、`Ultraman.pmd` → `chaos-ultraman.glb`（第 7 波）、`Zetton (50m).pmx` → `zetton.glb`（第 8 波，40 根骨）、`Mecha Gomora Kaiju Size 1.2.pmx` → `gomora-mecha.glb`（第 9 波，111 根骨）、`Galactron.pmx` → `galactron.glb`（第 10 波，92 根骨）、`Gatanothor.pmx`（`Gatanothor (MMDCharizard)` 包，作者 十三月）→ `gatanothor.glb`（第 11 波最终 boss，155 根骨、6214 面；没有 `ひじ`/`UDE`，用 `腕3` 作前臂，脚下贴地、没有垂地尾巴）。骨骼命名两种都有：罗马字（`KOSHI` 髋、`MUNE` 胸、`KUBI` 颈、`L/R_ZYOUWAN` 上臂、`L/R_UDE` 前臂、`L/R_TE` 手、`L/R_MOMO` 大腿、`L/R_SUNE` 小腿、`L/R_ASHI` 脚）与日文（`下半身`/`上半身`/`首`/`腕.L`/`ひじ.L`/`手首.L`/`足.L`/`ひざ.L`/`足首.L`）；`src/monster-motion.js` 两套名字都能解析，攻击光弹从手骨位置发出。同包的 `Powered Baltan.pmd`、`Mecha Baltan.pmd`、`机械哥莫拉`、`铁三角（卡欧斯S/T/U）` 都可以用同一脚本转换。
 
+### 招式：每只怪兽一套动作
+
+`src/monster-poses.js` 是一张「怪兽 × 招式」的姿势表（蓄力/出手两个阶段、手臂与前臂方向、胸/头/髋旋转、可选腿部动作、发射点），`src/monster-motion.js` 的 `moveStage()` 负责插值、`aimLimb()` 负责把整条手臂骨链指向目标方向，`origin()` 按 `emit` 返回口部/额头/头角/胸甲等真实发射点。原作招式名、动作要点与出处见 `docs/monster-moves.md`。
+
+`npm run test:poses` 会逐只怪兽抓骨骼签名（含方向，避免短手臂怪兽失真），断言与待机不同、与其它怪兽的同名招式不同，并检查斯派修姆「＋」、斯特利姆 T、赛文手贴头镖、杰顿面部发火球、哥莫拉头顶角发波、加坦杰厄双手下砸，截图写到 `artifacts/poses/`。
+
 ### 尾巴：折到身后并做柔性弯曲
 
 `art/mmd_tail.py` 是转换流程里的一步，专门处理垂到脚底以下的尾巴。下载模型里的尾巴（迦拉克隆是 `hair`～`hair11` 十一节，机械哥莫拉是 `tail1…`）有两个毛病：一是整条竖直垂在腿前、还穿过地面；二是每节权重都是 1.0，弯折像铰链硬折。

@@ -1,4 +1,6 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
+import { EMIT_OFFSETS, REST_ARM, emitFor, moveFor } from './monster-poses.js';
+
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const Q = () => new THREE.Quaternion();
 const clamp = THREE.MathUtils.clamp;
@@ -37,6 +39,7 @@ export class MonsterMotion {
       hips: pick('KOSHI', 'センター', '下半身'),
       chest: pick('MUNE', '上半身2', '上半身'),
       neck: pick('KUBI', '首'),
+      head: pick('KAO', '頭', 'head', 'HEAD', 'ATAMA'),
       arm: pair('ZYOUWAN', '腕'),
       fore: pair('UDE', 'ひじ'),
       hand: pair('TE', '手首'),
@@ -171,11 +174,28 @@ export class MonsterMotion {
       ? point.clone().addScaledVector(point.clone().sub(forearm.getWorldPosition(V())).normalize(), 0.6)
       : point;
   }
+  /** World-space emission point for mouth / forehead / horn / chest moves. */
+  emitPoint(kind) {
+    const offset = EMIT_OFFSETS[kind];
+    if (!offset) return null;
+    const anchor = kind === 'chest' ? this.rig?.chest : this.rig?.head || this.rig?.neck;
+    if (!anchor) return null;
+    const scale = this.root.scale?.x || 1;
+    const direction = V(offset[0], offset[1], offset[2])
+      .multiplyScalar(scale)
+      .applyQuaternion(this.root.getWorldQuaternion(Q()));
+    return anchor.getWorldPosition(V()).add(direction);
+  }
   origin(side = 'R') {
     if (this.type === 'ganq') return this.root.localToWorld(V(0, 10.8, 3.5));
     if (this.mmd) {
-      const point = this.mmdHand(side);
+      // Canon moves can leave the body somewhere other than a hand: Zetton's
+      // fireball comes out of the face, Gomora's wave out of the horn.
+      const emit = this.attack ? emitFor(this.type, this.attack.kind) : 'hand';
+      const point = emit === 'hand' ? null : this.emitPoint(emit);
       if (point) return point;
+      const hand = this.mmdHand(side);
+      if (hand) return hand;
     }
     const hand =
       this.type === 'redking'
@@ -242,6 +262,50 @@ export class MonsterMotion {
       this.aim(chain[i].name, chain[i + 1].name, i < cut ? first : second);
   }
 
+  /** Idle arms: hanging, slightly forward, matching the pre-move-pose look. */
+  restArms() {
+    for (const limb of ['L', 'R']) {
+      const out = limb === 'L' ? 1 : -1;
+      this.aimLimb(limb, V(out * 0.3, -1, 0.06), V(out * 0.14, -1, 0.12), 0.45);
+    }
+  }
+
+  /**
+   * Interpolated targets for the active move: idle → wind-up → strike. Returns
+   * plain arrays so the pose table stays data-only (and unit-testable).
+   */
+  moveStage(spec, active, gather, strike) {
+    const flight = active.phase === 'flight';
+    const target = (flight ? spec.flight : spec.windup) || spec.windup || spec.flight;
+    const base = flight ? spec.windup || spec.flight : null;
+    const t = flight ? strike : gather;
+    const mix = (from, to) => [
+      from[0] + (to[0] - from[0]) * t,
+      from[1] + (to[1] - from[1]) * t,
+      from[2] + (to[2] - from[2]) * t,
+    ];
+    const arms = {},
+      lower = {},
+      legs = {},
+      rotations = {};
+    for (const limb of ['L', 'R']) {
+      const rest = REST_ARM[limb];
+      const armFrom = base?.arms?.[limb] || rest;
+      arms[limb] = target.arms?.[limb] ? mix(armFrom, target.arms[limb]) : armFrom;
+      const lowerFrom = base?.lower?.[limb] || armFrom;
+      lower[limb] = target.lower?.[limb] ? mix(lowerFrom, target.lower[limb]) : arms[limb];
+      const legFrom = base?.legs?.[limb] || [0, -1, 0.15];
+      if (target.legs?.[limb]) legs[limb] = mix(legFrom, target.legs[limb]);
+    }
+    for (const name of ['chest', 'head', 'hips']) {
+      const goal = target[name];
+      if (!goal) continue;
+      const from = base?.[name] || goal.map(() => 0);
+      rotations[name] = goal.map((value, i) => from[i] + (value - from[i]) * t);
+    }
+    return { arms, lower, legs, rotations };
+  }
+
   turn(name, axis, angle) {
     const bone = this.node(name);
     if (!bone) return;
@@ -284,17 +348,37 @@ export class MonsterMotion {
       const strike = active?.phase === 'flight' ? ease(active.age / active.flight) : 0;
       const castSide = active?.safeSide > 0 ? 'L' : 'R';
       const sign = castSide === 'L' ? 1 : -1;
-      for (const limb of ['L', 'R']) {
-        const out = limb === 'L' ? 1 : -1;
-        this.aimLimb(limb, V(out * 0.3, -1, 0.06), V(out * 0.14, -1, 0.12), 0.45);
-      }
+      const spec = active ? moveFor(this.type, active.kind) : null;
+      const pose = spec ? this.moveStage(spec, active, gather, strike) : null;
+      this.restArms();
       if (rig.neck)
         this.turn(rig.neck.name, V(1, 0, 0), active?.kind === 'charge' ? 0.12 * gather : 0.05 * Math.sin(time * 1.7));
       if (rig.chest) {
         this.turn(rig.chest.name, V(1, 0, 0), 0.02 * Math.sin(time * 1.3));
         this.turn(rig.chest.name, V(0, 1, 0), 0.03 * Math.sin(time * 0.9));
       }
-      if (active) {
+      if (pose) {
+        // Torso first: the arms are re-aimed in root space afterwards, so the
+        // chest rotation reads as a body twist without bending the limbs.
+        const rotate = (bone, name) => {
+          const angles = pose.rotations[name];
+          if (!bone || !angles) return;
+          if (angles[0]) this.turn(bone.name, V(1, 0, 0), angles[0]);
+          if (angles[1]) this.turn(bone.name, V(0, 1, 0), angles[1]);
+        };
+        rotate(rig.hips, 'hips');
+        rotate(rig.chest, 'chest');
+        rotate(rig.head || rig.neck, 'head');
+        for (const limb of ['L', 'R']) {
+          const upper = pose.arms[limb];
+          const lower = pose.lower[limb] || upper;
+          this.aimLimb(limb, V(upper[0], upper[1], upper[2]), V(lower[0], lower[1], lower[2]), 0.45);
+          const leg = pose.legs[limb];
+          if (leg && rig.thigh[limb] && rig.shin[limb])
+            this.aim(rig.thigh[limb].name, rig.shin[limb].name, V(leg[0], leg[1], leg[2]));
+        }
+      } else if (active) {
+        // Fallback for a slot this monster does not define: the shared routine.
         if (active.kind === 'bolt' || active.kind === 'sweep') {
           // Y is up and +Z is toward the player, so a wind-up has to lift the arm
           // forward-up; pointing it at -Z raised it behind the shoulder instead.

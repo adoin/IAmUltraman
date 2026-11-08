@@ -3,7 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BattleEngine, SKILLS, CELEBRATION, WAVES} from './combat.js';
 import {MonsterMotion} from './monster-motion.js';
 import {HeroAnimation} from './hero-animation.js';
-import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
+import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming} from './action-timing.js';
 import {BeamVolume} from './beam-effect.js';
 const clamp=THREE.MathUtils.clamp,mix=THREE.MathUtils.lerp;
 const hitColor=new THREE.Color(0xffe3c8);
@@ -19,7 +19,7 @@ export class BattleScene extends BattleEngine {
     this.camera=new THREE.PerspectiveCamera(57,1,.08,700);this.camera.position.set(0,9,20);this.camera.lookAt(0,6,-25);this.renderScene.add(this.camera);
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.65));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-    this.models=new Map();this.monsterAnimations=new Map();this.currentMonster=null;this.visualEffects=[];this.hitFlash=0;this.hurt=0;this.defenseFlash=0;this.renderLean=0;this.guardAmount=0;this.modelError=null;this.assetReady=false;this.lastNow=performance.now();this.frameCount=0;this.victoryActor=null;this.victoryMixer=null;this.victoryClip=null;this.celebration=null;this.celebrationAge=0;
+    this.models=new Map();this.monsterAnimations=new Map();this.currentMonster=null;this.visualEffects=[];this.hitFlash=0;this.hurt=0;this.defenseFlash=0;this.renderLean=0;this.guardAmount=0;this.modelError=null;this.assetReady=false;this.zepellionStage=0;this.lastNow=performance.now();this.frameCount=0;this.victoryActor=null;this.victoryMixer=null;this.victoryClip=null;this.celebration=null;this.celebrationAge=0;
     this.makeWorld();this.makeForeground();this.ready=this.loadAssets().catch(error=>{this.modelError=String(error);this.clientEvent({type:'load-error',error:this.modelError});throw error;});this.ready.catch(()=>{});
     this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(canvas);this.resize();
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();this.paused=true;this.clientEvent({type:'graphics-lost'});});
@@ -250,6 +250,8 @@ export class BattleScene extends BattleEngine {
     this.celebration=null;
     this.camera.position.set(0,9,20);this.camera.rotation.set(0,0,0);this.camera.lookAt(0,6,-25);
   }
+  /** Pose-recognition stage for the Zepellion pre-motion (0 none, 1 gathered, 2 L formed). */
+  setPoseStage(stage){this.zepellionStage=stage|0;}
   selectMonster(){
     if(!this.assetReady)return;
     const requested=this.waveInfo.model;
@@ -280,9 +282,9 @@ export class BattleScene extends BattleEngine {
     if(kind==='disc'){this.hero.discSide=data.side||'right';this.hero.updateSockets();}
     const group=new THREE.Group();this.renderScene.add(group);this.camera.updateMatrixWorld(true);
     const start=this.hero.socketWorld(kind),end=this.getHitPoint();
-    const timing=kind==='disc'?discTiming(data):null;
     const beamFamily=kind==='beam'||kind==='zepellion',ultra=kind==='zepellion';
-    const entry={kind,group,side:data.side,prepared:data.prepared,timing,age:0,duration:beamFamily?BEAM_TIMING.lightEnd:timing?.end??SKILLS[kind].duration,start,end};
+    const timing=kind==='disc'?discTiming(data):ultra?ZEPELLION_TIMING:kind==='beam'?BEAM_TIMING:null;
+    const entry={kind,group,side:data.side,prepared:data.prepared,timing,age:0,duration:beamFamily?timing.lightEnd:timing?.end??SKILLS[kind].duration,start,end};
     if(kind==='palm'){
       entry.orb=this.flare(start,0x89eaff,1.8,group,1);entry.core=this.flare(start,0xffffff,.55,group,1);
     }else if(beamFamily){
@@ -415,12 +417,12 @@ export class BattleScene extends BattleEngine {
       }
     if(e.kind==='beam'||e.kind==='zepellion'){
         e.start.copy(this.hero.socketWorld('beam'));e.end.copy(this.getHitPoint());
-        const firing=e.age>=BEAM_TIMING.fire,reveal=clamp((e.age-BEAM_TIMING.fire)/(BEAM_TIMING.impact-BEAM_TIMING.fire),0,1),fade=clamp((e.duration-e.age)/(e.duration-BEAM_TIMING.fade),0,1);
+        const bt=e.timing||BEAM_TIMING;const firing=e.age>=bt.fire,reveal=clamp((e.age-bt.fire)/(bt.impact-bt.fire),0,1),fade=clamp((e.duration-e.age)/(e.duration-bt.fade),0,1);
         const [bottom,top]=this.hero.beamRail();e.volume.update(bottom,top,e.end,reveal,e.age,fade,this.reduced);
-        const charge=clamp((e.age-.07)/(BEAM_TIMING.fire-.07),0,1);
+        const charge=clamp((e.age-.07)/(bt.fire-.07),0,1);
         e.launch.position.copy(e.start);e.launch.material.opacity=(firing?.45:charge*.25)*fade;e.launch.scale.setScalar(firing?.65:.18+charge*.4);
         e.sourceCore.position.copy(e.start);e.sourceCore.material.opacity=(firing?.9:charge*.55)*fade;
-        e.contact.position.copy(e.end);e.contact.material.opacity=e.age>=BEAM_TIMING.impact?.65*fade:0;e.light.position.copy(e.start);e.light.intensity=(firing?65:charge*18)*fade;
+        e.contact.position.copy(e.end);e.contact.material.opacity=e.age>=bt.impact?.65*fade:0;e.light.position.copy(e.start);e.light.intensity=(firing?65:charge*18)*fade;
       }
       if(e.kind==='impact'){for(const [i,ring]of e.rings.entries()){ring.scale.setScalar(1+t*(3+i));ring.material.opacity=(1-t)*.85;}e.group.children.filter(o=>o.isSprite).forEach(o=>{o.material.opacity=1-t;});e.light.intensity*=Math.max(0,1-dt*8);}if(e.kind==='enemy-bolt'){const release=e.rock?.15:.2;if(t<release)e.start.copy(this.monsterMotion.origin(e.side));const flight=clamp((t-release)/(1-release),0,1);e.group.position.lerpVectors(e.start,e.end,flight);if(e.rock)e.group.position.y+=Math.sin(flight*Math.PI)*3;e.group.rotation.z=e.age*(e.rock?2:5);e.group.scale.setScalar(e.rock?1:1+flight*.8);}if(e.kind==='enemy-slam'){const travel=clamp((t-.28)/.72,0,1);e.group.visible=t>=.28;e.group.scale.setScalar(1+travel*this.enemyDistance);e.group.children[0].material.opacity=1-travel*.7;}if(e.kind==='enemy-sweep'){const start=this.monsterMotion.origin(e.side),end=V(-e.safeSide*11*(1-t),8,20),delta=end.clone().sub(start);e.beam.position.copy(start).addScaledVector(delta,.5);e.beam.quaternion.setFromUnitVectors(V(0,1,0),delta.clone().normalize());e.beam.scale.set(1,delta.length(),1);e.source.position.copy(start);const positions=e.sheet.geometry.attributes.position;positions.setXYZ(0,start.x,start.y-.12,start.z);positions.setXYZ(1,start.x,start.y+.12,start.z);positions.setXYZ(2,-e.safeSide*11,8,20);positions.setXYZ(3,end.x,end.y,end.z);positions.needsUpdate=true;e.group.visible=t>=.15;}if(e.kind==='enemy-charge'){e.group.position.copy(this.currentMonster.position);e.group.scale.setScalar(1+t*.5);for(const puff of e.group.children){if(e.phantom){puff.material.opacity=Math.sin(t*Math.PI)*.7;if(puff.userData.gate)puff.scale.setScalar(.6+t*.8);}else{puff.position.y=.2+Math.sin(e.age*12+puff.position.x)*.12;puff.material.opacity=.18*(1-t*.5);}}}if(e.kind==='sparks'){const points=e.group.children[0],array=points.geometry.attributes.position.array;e.velocity.forEach((v,i)=>{array[i*3]+=v.x*dt;array[i*3+1]+=v.y*dt;array[i*3+2]+=v.z*dt;v.y-=5*dt;});points.geometry.attributes.position.needsUpdate=true;points.material.opacity=1-t;}}
     this.visualEffects=this.visualEffects.filter(e=>{if(e.age<e.duration)return true;this.disposeObject(e.group);return false;});

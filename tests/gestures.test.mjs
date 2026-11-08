@@ -1,6 +1,7 @@
-import {test} from 'node:test';
+﻿import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {GestureRecognizer} from '../src/gestures.js';
+import {GestureRecognizer,POSE_HOLDS} from '../src/gestures.js';
+import {BEAM_TIMING,ZEPELLION_TIMING} from '../src/action-timing.js';
 function pose(coords){const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;}
 const cross=pose({11:[250,180],12:[390,180],13:[260,260],15:[395,260],14:[350,300],16:[350,185]});
 const raised=pose({11:[250,180],12:[390,180],13:[230,180],15:[250,60],14:[410,260],16:[420,310]});
@@ -65,16 +66,44 @@ test('releasing the forward palm re-arms the next arrow',()=>{
 });
 
 test('a punch spread over several camera frames retains its original retracted depth',()=>{const {bent,forward}=punchPoses(),r=new GestureRecognizer();r.update(bent,0);let seen=[];for(let n=1;n<=7;n++){const t=n/7,p=bent.map((a,i)=>({x:a.x+(forward[i].x-a.x)*t,y:a.y+(forward[i].y-a.y)*t,z:(a.z||0)+((forward[i].z||0)-(a.z||0))*t,visibility:1}));const out=r.update(p,n*65);if(out.punch)seen.push(out.punch);}assert.deepEqual(seen,['left']);});
-test('an L-shaped arm pose fires the Zepellion ray once and a crossed pose never does',()=>{
-  const pose=coords=>{const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;};
-  const L=pose({11:[250,180],12:[390,180],13:[255,300],15:[255,190],14:[400,300],16:[275,300]});
-  const r=new GestureRecognizer();let fired=0,guardSeen=false;
-  for(let t=0;t<=1400;t+=100){const out=r.update(L,t);if(out.skill==='zepellion')fired++;if(out.guard)guardSeen=true;}
+function poseFrom(coords){const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;}
+// Stage 1: both palms drawn together in front of the chest (Tiga gathers first).
+const gatherPose=poseFrom({11:[250,180],12:[390,180],13:[270,240],15:[310,250],14:[370,240],16:[330,250]});
+// Stage 2: the L from the hand book, forearms meeting without crossing.
+const lPose=poseFrom({11:[250,180],12:[390,180],13:[255,300],15:[255,190],14:[400,300],16:[275,300]});
+test('the L pose alone never fires the ray: the gather has to come first',()=>{
+  const r=new GestureRecognizer();let fired=0,stages=new Set();
+  for(let t=0;t<=1600;t+=100){const out=r.update(lPose,t);if(out.skill==='zepellion')fired++;stages.add(out.zepellionStage);}
+  assert.equal(fired,0,'an L without the gather must not fire');
+  assert.deepEqual([...stages],[0]);
+});
+test('gather then L fires the Zepellion ray once and reports both stages',()=>{
+  const r=new GestureRecognizer();const stages=[];let fired=0;
+  for(let t=0;t<=400;t+=100){const out=r.update(gatherPose,t);stages.push(out.zepellionStage);}
+  assert.ok(stages.includes(1),'gathering must report stage 1');
+  let firedStage=null;
+  for(let t=500;t<=1800;t+=100){const out=r.update(lPose,t);stages.push(out.zepellionStage);if(out.skill==='zepellion'){fired++;firedStage=out.zepellionStage;}}
   assert.equal(fired,1);
-  assert.equal(guardSeen,false,'the L pose must not read as the X shield');
-  const cross=pose({11:[250,180],12:[390,180],13:[260,260],15:[395,260],14:[350,300],16:[350,185]});
-  const r2=new GestureRecognizer();
-  for(let t=0;t<=1400;t+=100)assert.notEqual(r2.update(cross,t).skill,'zepellion','a crossed "+" stays the Mebium ray');
+  assert.equal(firedStage,2,'the ray fires from the formed L');
+  assert.ok(stages.includes(2));
+});
+test('gathering and then flashing an L too briefly does not fire',()=>{
+  const r=new GestureRecognizer();
+  for(let t=0;t<=400;t+=100)r.update(gatherPose,t);
+  let fired=0;
+  // Hold the L for less than the dwell, then drop out of it, twice.
+  for(let t=500;t<=900;t+=100){if(r.update(lPose,t).skill==='zepellion')fired++;}
+  r.update(null,1000);
+  for(let t=1100;t<=1400;t+=100){if(r.update(lPose,t).skill==='zepellion')fired++;}
+  assert.equal(fired,0);
+});
+test('the Zepellion dwell is at least 1.5x the Mebium dwell and the ray needs more time',()=>{
+  assert.ok(POSE_HOLDS.zepellionEasy>=POSE_HOLDS.beamEasy*1.5);
+  assert.ok(POSE_HOLDS.zepellionNormal>=POSE_HOLDS.beamNormal*1.5);
+  assert.ok(POSE_HOLDS.gatherEasy>0&&POSE_HOLDS.gatherNormal>POSE_HOLDS.gatherEasy);
+  assert.ok(ZEPELLION_TIMING.ready>=BEAM_TIMING.ready*1.5,'the Zepellion ready phase must be longer');
+  assert.ok(ZEPELLION_TIMING.impact>=BEAM_TIMING.impact+.2,'contact must land later than the Mebium ray');
+  assert.ok(ZEPELLION_TIMING.gather<ZEPELLION_TIMING.form&&ZEPELLION_TIMING.form<=ZEPELLION_TIMING.fire);
 });
 test('a waist-high spare hand with a forward arm is enough for the palm sword',()=>{
   const pose=coords=>{const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;};

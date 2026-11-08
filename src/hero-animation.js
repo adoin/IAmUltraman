@@ -227,6 +227,7 @@ export class HeroAnimation {
     this.beamUp=worldUp;
     this.beamBase=this.beamPose(worldUp,0);
     this.beam=this.beamPose(worldUp);
+    this.gather=this.gatherPose();
   }
 
   beamPose(up,lead=1){
@@ -307,6 +308,18 @@ export class HeroAnimation {
     return [fitted,upright];
   }
 
+  /**
+   * Zepellion pre-motion: both palms drawn together in front of the chest with
+   * the elbows open. It has to read as a different silhouette than the Mebium
+   * cross, because the player's L-shaped pose has to build up first.
+   */
+  gatherPose(){
+    const poses=this.neutral.map(copyPose);
+    poses[0]=state(v(.62,-.40,-.70),v(-.62,.30,-.52),v(1,0,0),'blade',v(-.55,.22,-.80));
+    poses[1]=state(v(-.62,-.40,-.70),v(.62,.30,-.52),v(-1,0,0),'blade',v(.55,.22,-.80));
+    return poses;
+  }
+
   punchPose(side,extended){
     const poses=this.boxing.map(copyPose);
     for(const pose of poses)pose.shape={fist:1};
@@ -354,15 +367,23 @@ export class HeroAnimation {
     let target;
     if(beam){
       this.syncBeamPose();
+      // Zepellion carries its own three-beat timing; the Mebium ray keeps BEAM_TIMING.
+      const timing=beam.timing||BEAM_TIMING, ultra=beam.kind==='zepellion';
       const t=beam.age;
-      if(t<BEAM_TIMING.ready){
-        const phase=t/BEAM_TIMING.ready;
-        target=[blend(this.entry[0],this.beamBase[0],(phase-.15)/.85),blend(this.entry[1],this.beamBase[1],phase/.76)];
-      }else if(t<BEAM_TIMING.lightEnd){
-        const lead=clamp((t-BEAM_TIMING.ready)/.12,0,1);
+      const gatherEnd=ultra?(timing.gather??.55):timing.ready;
+      if(t<gatherEnd){
+        const phase=t/gatherEnd;
+        target=ultra
+          ?[blend(this.entry[0],this.gather[0],(phase-.12)/.88),blend(this.entry[1],this.gather[1],phase/.8)]
+          :[blend(this.entry[0],this.beamBase[0],(phase-.15)/.85),blend(this.entry[1],this.beamBase[1],phase/.76)];
+      }else if(ultra&&t<timing.form){
+        const phase=(t-gatherEnd)/(timing.form-gatherEnd);
+        target=[blend(this.gather[0],this.beamBase[0],phase),blend(this.gather[1],this.beamBase[1],phase/.85)];
+      }else if(t<timing.lightEnd){
+        const lead=clamp((t-gatherEnd)/.12,0,1);
         target=lead<1?this.beamPose(this.beamUp,lead):this.beam;
       }else{
-        const phase=(t-BEAM_TIMING.lightEnd)/(BEAM_TIMING.end-BEAM_TIMING.lightEnd);
+        const phase=(t-timing.lightEnd)/(timing.end-timing.lightEnd);
         target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
       }
     }else if(palm){

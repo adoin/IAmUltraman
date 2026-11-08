@@ -1,0 +1,26 @@
+﻿import {chromium} from "playwright";
+const browser=await chromium.launch({channel:"chrome",headless:true});
+const page=await browser.newPage({viewport:{width:480,height:360}});
+page.on("pageerror",e=>console.log("PAGEERROR",String(e)));
+await page.goto("http://127.0.0.1:4173",{waitUntil:"domcontentloaded"});
+const battle=`(await import(document.querySelector('script[type=module]').src)).battle`;
+await page.waitForFunction(`(async()=>{const b=${battle};return b.assetReady===true})()`,{timeout:180000});
+await page.locator("#start-keyboard").click();
+await page.waitForFunction(()=>document.body.classList.contains("in-battle"));
+const info=await page.evaluate(`(async()=>{
+  const b=${battle};b.renderer.setAnimationLoop(null);await b.prefetch;
+  const T=await import("three");
+  b.start();b.wave=2;b.monsterMax=b.waveInfo.hp;b.monsterHealth=b.monsterMax;b.nextAttack=1e9;b.attack=null;b.selectMonster();
+  for(let i=0;i<40;i++)b.advance(1/30);
+  const mm=b.monsterMotion, V=(x,y,z)=>new T.Vector3(x,y,z);
+  const P=()=>{const p=mm.rig.hand.L.getWorldPosition(new T.Vector3());const o=mm.root.getWorldPosition(new T.Vector3());const s=mm.root.getWorldScale(new T.Vector3()).x*16;return [ +((p.x-o.x)/s).toFixed(3),+((p.y-o.y)/s).toFixed(3),+((p.z-o.z)/s).toFixed(3) ];};
+  const idle=P();
+  mm.restArms();
+  const afterRest=P();
+  mm.aimLimb("L",V(0.72,0.5,0.2),V(0.72,0.5,0.2),0.45);
+  const afterAim=P();
+  const spec=mm.moveStage((await import(new URL("src/monster-poses.js",document.baseURI).href)).MONSTER_MOVES.baltan.bolt,{phase:"windup",age:1.2,windup:2.2},0.65,0);
+  return {idle,afterRest,afterAim,stageArms:spec.arms,chain:mm.limbs.L.map(n=>n.name)};
+})()`);
+console.log(JSON.stringify(info,null,1));
+await browser.close();
