@@ -28,4 +28,40 @@ test('a visible hand can punch while the other wrist is occluded, without stale 
 
 test('torso translation alone and lateral straight-arm waving do not punch',()=>{const {bent}=punchPoses(),r=new GestureRecognizer();r.update(bent,0);const shifted=bent.map(p=>({...p,x:p.x+.15}));assert.equal(r.update(shifted,150).punch,null);r.reset();r.update(bent,0);const waved=structuredClone(bent);waved[13]={x:180/640,y:190/480,z:0,visibility:1};waved[15]={x:100/640,y:180/480,z:0,visibility:1};assert.equal(r.update(waved,150).punch,null);});
 
+// A child pushing one palm at the camera keeps a slightly bent elbow and the
+// spare hand near the chest, which the old strict test rejected outright.
+function palmPush({elbowBend=0,spareY=225}={}){
+  const p=pose({11:[250,180],12:[390,180],13:[230,190],15:[255,185],14:[410,240],16:[420,spareY]});
+  p[13].z=-.10;p[15].z=-.35-elbowBend;p[11].z=0;p[12].z=0;
+  return p;
+}
+test('a slightly bent forward palm with the spare hand at chest height fires once',()=>{
+  const r=new GestureRecognizer(),p=palmPush({elbowBend:.05,spareY:225});
+  let fired=0,last;
+  for(let t=0;t<=1200;t+=80){last=r.update(p,t);if(last.skill==='palm')fired++;}
+  assert.equal(fired,1);assert.equal(last.skill,null);
+});
+test('one noisy frame does not restart the palm dwell',()=>{
+  const r=new GestureRecognizer(),p=palmPush(),standing=p.map(v=>({...v}));
+  standing[13]={x:255/640,y:260/480,z:0,visibility:1};standing[15]={x:258/640,y:330/480,z:0,visibility:1};
+  assert.equal(r.update(p,0).skill,null);
+  assert.equal(r.update(p,160).skill,null);
+  assert.equal(r.update(standing,240).skill,null);
+  assert.equal(r.update(p,320).skill,null);
+  assert.equal(r.update(p,560).skill,'palm');
+});
+test('wide side reach and lowered arms never read as a palm push',()=>{
+  const r=new GestureRecognizer();const wide=pose({11:[250,180],12:[390,180],13:[180,180],15:[120,180],14:[420,235],16:[430,245]});
+  for(let t=0;t<=900;t+=100)assert.equal(r.update(wide,t).skill,null);
+  r.reset();const down=pose({11:[250,180],12:[390,180],13:[255,260],15:[258,330],14:[385,260],16:[382,330]});
+  for(let t=0;t<=900;t+=100)assert.equal(r.update(down,t).skill,null);
+});
+test('releasing the forward palm re-arms the next arrow',()=>{
+  const r=new GestureRecognizer(),p=palmPush();const away=p.map(v=>({...v,x:1-v.x}));
+  let fired=0;for(let t=0;t<=700;t+=70)if(r.update(p,t).skill==='palm')fired++;
+  assert.equal(fired,1);r.update(null,760);
+  for(let t=800;t<=1500;t+=70)if(r.update(p,t).skill==='palm')fired++;
+  assert.equal(fired,2);assert.equal(r.update(away,1560).skill,null);
+});
+
 test('a punch spread over several camera frames retains its original retracted depth',()=>{const {bent,forward}=punchPoses(),r=new GestureRecognizer();r.update(bent,0);let seen=[];for(let n=1;n<=7;n++){const t=n/7,p=bent.map((a,i)=>({x:a.x+(forward[i].x-a.x)*t,y:a.y+(forward[i].y-a.y)*t,z:(a.z||0)+((forward[i].z||0)-(a.z||0))*t,visibility:1}));const out=r.update(p,n*65);if(out.punch)seen.push(out.punch);}assert.deepEqual(seen,['left']);});

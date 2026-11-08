@@ -1,10 +1,25 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {BattleEngine,ATTACKS,SHIELD} from '../src/combat.js';
+import {BattleEngine,ATTACKS,SHIELD,CELEBRATION,WAVES} from '../src/combat.js';
 function battle(){const events=[];const scene=new BattleEngine(e=>events.push(e));scene.start();return{scene,events};}
 function advance(s,seconds){for(let t=0;t<seconds;t+=.05)s.update(.05);}
 function impact(s,kind){s.beginAttack(kind);advance(s,ATTACKS[kind].windup+ATTACKS[kind].flight+.1);}
-test('five defeated monsters complete adventure and award 30 base stars',()=>{const{scene:s,events}=battle();for(let i=0;i<5;i++){s.damage(1000);advance(s,3.1);}assert.equal(s.stars,30);assert.equal(s.finished,true);assert.ok(events.some(e=>e.type==='victory'));});
+test('every wave is defeated before the adventure ends and stars add up',()=>{const{scene:s,events}=battle();const waves=WAVES.length;for(let i=0;i<waves;i++){s.damage(1000);advance(s,3.1);}assert.equal(s.stars,waves*3+waves*(waves+1)/2);assert.equal(s.finished,true);assert.ok(events.some(e=>e.type==='victory'));});
+test('the last victory plays a timed celebration before the results panel',()=>{
+  const{scene:s,events}=battle();
+  for(let i=0;i<WAVES.length;i++){s.damage(1000);advance(s,3.1);}
+  assert.ok(s.celebrating>CELEBRATION.duration-.2);
+  assert.equal(s.cast('beam'),false);assert.equal(s.punch(),false);
+  advance(s,CELEBRATION.duration*.5);
+  assert.equal(events.some(e=>e.type==='celebration-end'),false);
+  s.paused=true;advance(s,10);assert.ok(s.celebrating>0);s.paused=false;
+  advance(s,CELEBRATION.duration*.5+.1);
+  assert.equal(s.celebrating,0);
+  assert.ok(events.some(e=>e.type==='celebration-end'));
+  const end=events.filter(e=>e.type==='celebration-end');
+  assert.equal(end.length,1);assert.ok(end[0].stars>0);
+  s.start();assert.equal(s.celebrating,0);
+});
 test('enemy windup warns without deducting energy; damage occurs on impact',()=>{const{scene:s,events}=battle();s.beginAttack('bolt');advance(s,2.3);assert.equal(s.heroHealth,100);assert.ok(events.some(e=>e.type==='telegraph'));assert.ok(events.some(e=>e.type==='enemy-cast'));advance(s,1.2);assert.equal(s.heroHealth,86);});
 test('raising the shield on the incoming strike blocks each monster attack',()=>{for(const kind of Object.keys(ATTACKS)){const{scene:s}=battle();s.beginAttack(kind);advance(s,ATTACKS[kind].windup+.1);s.setDefense(true);advance(s,ATTACKS[kind].flight+.1);assert.equal(s.heroHealth,100,kind);assert.equal(s.stats.blocked,1,kind);assert.equal(s.stars,1);assert.ok(s.guardEnergy<100);}});
 test('side step dodges aimed projectiles and charge; standing in place does not',()=>{for(const kind of ['bolt','charge']){const{scene:s}=battle();s.beginAttack(kind);s.setDefense(false,1);advance(s,4);assert.equal(s.stats.dodged,1);assert.equal(s.heroHealth,100);}});

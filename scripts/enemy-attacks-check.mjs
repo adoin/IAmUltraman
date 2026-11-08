@@ -33,7 +33,7 @@ try {
   for (const [wave, name, kinds] of [
     [1, 'redking', ['melee', 'bolt', 'slam', 'charge']],
     [2, 'baltan', ['melee', 'bolt', 'sweep', 'charge']],
-    [3, 'ganq', ['bolt', 'sweep', 'melee', 'charge']],
+    [4, 'ganq', ['bolt', 'sweep', 'melee', 'charge']],
   ])
     for (const kind of kinds) {
       const base = await act(

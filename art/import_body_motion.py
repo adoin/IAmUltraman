@@ -1,8 +1,10 @@
-"""Bake a Quaternius Universal Animation Library punch onto the complete Tiga body.
+"""Bake a Quaternius Universal Animation Library clip onto the complete Tiga body.
 
-Blender 5.2, --background --factory-startup --disable-autoexec --python-exit-code 1
---python art/import_body_motion.py -- --library PATH/UAL1_Standard.glb
-The original model never executes its legacy drivers.
+Blender 5.4, --background --factory-startup --disable-autoexec --python-exit-code 1
+--python art/import_body_motion.py -- --library PATH/UAL1_Standard.glb [--clip Dance_Loop]
+The original model never executes its legacy drivers. Both documented CC0 releases
+(the Unreal/Godot .glb pack and the Godot .gltf mirror) are accepted; the mirror
+uses Rigify deform-bone names, resolved through GODOT_MIRROR below.
 """
 
 import argparse
@@ -22,17 +24,24 @@ parser.add_argument(
     help="UAL1_Standard.glb from the free Quaternius Standard pack",
 )
 parser.add_argument(
-    "--clip", choices=["Punch_Cross", "Punch_Jab"], default="Punch_Cross"
+    "--clip", default="Punch_Cross", help="Animation name inside the library"
 )
 parser.add_argument(
-    "--output", type=Path, default=repo / "public/motion-preview/tiga-punch.glb"
+    "--output", type=Path, default=None, help="GLB target; defaults per clip"
 )
 args = parser.parse_args(sys.argv[sys.argv.index("--") + 1 :])
+KNOWN_LIBRARIES = {
+    "69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997": "UAL1_Standard.glb",
+    "0ff075c7ad6855c5c2c37a171592ee8f0d6ab2f58259e2be77a9b63dd8027765": "AnimationLibrary_Godot_Standard.gltf",
+}
 source_hash = hashlib.sha256(args.library.read_bytes()).hexdigest()
-if source_hash != "69591853d817488edaa8fd9bf8fc1d821eaeaf789f8627b3cd23b41c4ed67997":
+if source_hash not in KNOWN_LIBRARIES:
     raise ValueError(
-        "Use the documented free UAL1_Standard.glb release. Other rigs need their own mapping."
+        "Use a documented free Quaternius Universal Animation Library release. Other rigs need their own mapping."
     )
+if args.output is None:
+    name = "tiga-punch" if args.clip in ("Punch_Cross", "Punch_Jab") else "tiga-" + args.clip.lower().replace("_", "-")
+    args.output = repo / "public/motion-preview" / (name + ".glb")
 V = Vector
 bpy.ops.wm.open_mainfile(
     filepath=str(repo / "art/sources/tiga/Ultraman Tiga.blend"),
@@ -293,18 +302,57 @@ eyeNode.matrix_world = Matrix(
 bpy.context.view_layer.update()
 # Load only data via Blender's glTF importer. The original source rig is untouched.
 bpy.ops.import_scene.gltf(filepath=str(args.library))
-source = next(o for o in scene.objects if o.type == "ARMATURE" and o != rig)
+source = max(
+    (o for o in scene.objects if o.type == "ARMATURE" and o != rig),
+    key=lambda o: len(o.data.bones),
+)
 source.animation_data_create()
 for track in source.animation_data.nla_tracks:
     track.mute = True
-missing = sorted(set(defs) - set(source.data.bones.keys()))
+# The .glb pack names joints the way defs already does. The Godot .gltf mirror
+# keeps Blender's Rigify DEF- names, so resolve those through an explicit table.
+GODOT_MIRROR = {
+    "pelvis": "DEF-hips",
+    "spine_01": "DEF-spine.001",
+    "spine_02": "DEF-spine.002",
+    "spine_03": "DEF-spine.003",
+    "neck_01": "DEF-neck",
+    "Head": "DEF-head",
+}
+for side, tag in (("l", "L"), ("r", "R")):
+    GODOT_MIRROR.update(
+        {
+            "clavicle_" + side: "DEF-shoulder." + tag,
+            "upperarm_" + side: "DEF-upper_arm." + tag,
+            "lowerarm_" + side: "DEF-forearm." + tag,
+            "hand_" + side: "DEF-hand." + tag,
+            "thigh_" + side: "DEF-thigh." + tag,
+            "calf_" + side: "DEF-shin." + tag,
+            "foot_" + side: "DEF-foot." + tag,
+            "ball_" + side: "DEF-toe." + tag,
+        }
+    )
+    for finger in ("index", "middle", "ring", "pinky", "thumb"):
+        for number in (1, 2, 3):
+            prefix = "thumb" if finger == "thumb" else f"f_{finger}"
+            GODOT_MIRROR[f"{finger}_0{number}_{side}"] = (
+                f"DEF-{prefix}.0{number}.{tag}"
+            )
+SOURCE = {}
+missing = []
+for name in defs:
+    bone_name = name if name in source.data.bones else GODOT_MIRROR.get(name)
+    if bone_name is None or bone_name not in source.data.bones:
+        missing.append(name)
+    else:
+        SOURCE[name] = bone_name
 if missing:
-    raise ValueError(f"Input is missing mapped Quaternius bones: {missing}")
+    raise ValueError(f"Input is missing mapped Quaternius bones: {sorted(missing)}")
 if bpy.data.actions.get(args.clip) is None:
     raise ValueError(f"Animation {args.clip!r} missing from input")
 
 sr = {
-    n: (source.matrix_world @ source.data.bones[n].matrix_local)
+    n: (source.matrix_world @ source.data.bones[SOURCE[n]].matrix_local)
     .to_quaternion()
     .normalized()
     for n in defs
@@ -330,7 +378,7 @@ def palm_basis(wrist, index, middle, pinky):
 for side in ("l", "r"):
     names = [f"{stem}_{side}" for stem in ("hand", "index_01", "middle_01", "pinky_01")]
     source_palm = palm_basis(
-        *[source.matrix_world @ source.data.bones[n].head_local for n in names]
+        *[source.matrix_world @ source.data.bones[SOURCE[n]].head_local for n in names]
     )
     target_palm = palm_basis(*[defs[n][0] for n in names])
     matching = source_palm @ target_palm.inverted()
@@ -346,7 +394,7 @@ last = {}
 outFrame = 0
 clipRanges = []
 legScale = (head("hip").z - head("Foot_L").z) / (
-    source.matrix_world @ source.data.bones["pelvis"].head_local
+    source.matrix_world @ source.data.bones[SOURCE["pelvis"]].head_local
 ).z
 for clipName in [args.clip]:
     a = bpy.data.actions[clipName]
@@ -363,13 +411,13 @@ for clipName in [args.clip]:
         es = source.evaluated_get(bpy.context.evaluated_depsgraph_get())
         world = {}
         move = (
-            es.matrix_world @ es.pose.bones["pelvis"].head
-            - source.matrix_world @ source.data.bones["pelvis"].head_local
+            es.matrix_world @ es.pose.bones[SOURCE["pelvis"]].head
+            - source.matrix_world @ source.data.bones[SOURCE["pelvis"]].head_local
         ) * legScale
         points = {}
         for name in defs:
             pose = (
-                (es.matrix_world @ es.pose.bones[name].matrix)
+                (es.matrix_world @ es.pose.bones[SOURCE[name]].matrix)
                 .to_quaternion()
                 .normalized()
             )
@@ -390,19 +438,20 @@ for clipName in [args.clip]:
         for side in ("l", "r"):
             u, l, h = ("upperarm_" + side, "lowerarm_" + side, "hand_" + side)
             su, sl, sh = (
-                source.matrix_world @ source.data.bones[n].head_local for n in (u, l, h)
+                source.matrix_world @ source.data.bones[SOURCE[n]].head_local
+                for n in (u, l, h)
             )
             upperLength = (defs[u][1] - defs[u][0]).length
             lowerLength = (defs[l][1] - defs[l][0]).length
             scale = (upperLength + lowerLength) / ((sl - su).length + (sh - sl).length)
-            srcHead = es.matrix_world @ es.pose.bones["Head"].head
+            srcHead = es.matrix_world @ es.pose.bones[SOURCE["Head"]].head
             headTurn = (
-                es.matrix_world @ es.pose.bones["Head"].matrix
+                es.matrix_world @ es.pose.bones[SOURCE["Head"]].matrix
             ).to_quaternion() @ sr["Head"].inverted()
             sourceEye = srcHead + headTurn @ (eyeOrigin - defs["Head"][0]) / scale
             desired = (
                 targetEye
-                + ((es.matrix_world @ es.pose.bones[h].head) - sourceEye) * scale
+                + ((es.matrix_world @ es.pose.bones[SOURCE[h]].head) - sourceEye) * scale
             )
             # A guard can sit against the target's larger helmet even when the source
             # wrist clears the mannequin face. Ease only nearby wrists out of eye space.
@@ -460,8 +509,8 @@ for clipName in [args.clip]:
                 pb.keyframe_insert(data_path="location", frame=outFrame, group=name)
         # Correct the ground height for the target's different foot and leg lengths.
         sourceFloor = min(
-            (es.matrix_world @ es.pose.bones[n].head).z
-            - (source.matrix_world @ source.data.bones[n].head_local).z
+            (es.matrix_world @ es.pose.bones[SOURCE[n]].head).z
+            - (source.matrix_world @ source.data.bones[SOURCE[n]].head_local).z
             for n in ["foot_l", "foot_r"]
         )
         scene.frame_set(outFrame)

@@ -19,6 +19,60 @@ export class MonsterMotion {
       this.nodes.set(key(node.name), node);
       if (node.isBone) this.rest.set(node, node.quaternion.clone());
     });
+    // Converted MMD kaiju keep their skeleton. Two naming styles exist:
+    // romanised (L_ZYOUWAN / L_UDE / L_TE / MUNE / KOSHI) and Japanese
+    // (腕.L / ひじ.L / 手首.L / 上半身 / センター / 足.L / ひざ.L / 足首.L).
+    const pick = (...candidates) => {
+      for (const candidate of candidates) {
+        const node = this.node(candidate);
+        if (node) return node;
+      }
+      return null;
+    };
+    const pair = (english, japanese) => ({
+      L: pick('L_' + english, japanese + '.L', japanese + 'L'),
+      R: pick('R_' + english, japanese + '.R', japanese + 'R'),
+    });
+    this.rig = {
+      hips: pick('KOSHI', 'センター', '下半身'),
+      chest: pick('MUNE', '上半身2', '上半身'),
+      neck: pick('KUBI', '首'),
+      arm: pair('ZYOUWAN', '腕'),
+      fore: pair('UDE', 'ひじ'),
+      hand: pair('TE', '手首'),
+      thigh: pair('MOMO', '足'),
+      shin: pair('SUNE', 'ひざ'),
+      foot: pair('ASHI', '足首'),
+    };
+    this.mmd = !!(this.rig.arm.L && this.rig.arm.R && this.rig.hand.L && this.rig.hand.R && this.rig.chest);
+    // A tail baked behind the feet (art/mmd_tail.py) still needs life: sway the
+    // chain in world space so the appendage flexes instead of swinging rigidly.
+    const tail = [];
+    root.traverse((node) => {
+      if (node.isBone && /^(hair|尻尾|しっぽ|tail)\d*$/i.test(node.name)) tail.push(node);
+    });
+    this.tail = [];
+    if (tail.length >= 4) {
+      const depth = (bone) => {
+        let levels = 0;
+        for (let node = bone; node; node = node.parent) levels++;
+        return levels;
+      };
+      tail.sort((a, b) => depth(a) - depth(b));
+      root.updateWorldMatrix(true, true);
+      const tipY = tail[tail.length - 1].getWorldPosition(V()).y;
+      const restY = (this.rig.hips || root).getWorldPosition(V()).y;
+      // Head hair ends above the hips; only a real hanging tail passes this.
+      if (tipY < restY) this.tail = tail;
+    }
+    this.legRest = new Map();
+    if (this.mmd)
+      for (const limb of ['L', 'R']) {
+        const thigh = this.rig.thigh[limb];
+        const shin = this.rig.shin[limb];
+        if (thigh && shin)
+          this.legRest.set(limb, shin.getWorldPosition(V()).sub(thigh.getWorldPosition(V())).normalize());
+      }
     this.curlSigns = new Map();
     if (type === 'redking')
       for (const suffix of ['L', 'R']) {
@@ -102,8 +156,22 @@ export class MonsterMotion {
   node(name) {
     return this.nodes.get(key(name));
   }
+  /** MMD hand bone position, so a projectile leaves the actual claw. */
+  mmdHand(side) {
+    const hand = this.rig?.hand?.[side] || this.node(side + '_TE');
+    if (!hand) return null;
+    const forearm = this.rig?.fore?.[side] || this.node(side + '_UDE');
+    const point = hand.getWorldPosition(V());
+    return forearm
+      ? point.clone().addScaledVector(point.clone().sub(forearm.getWorldPosition(V())).normalize(), 0.6)
+      : point;
+  }
   origin(side = 'R') {
     if (this.type === 'ganq') return this.root.localToWorld(V(0, 10.8, 3.5));
+    if (this.mmd) {
+      const point = this.mmdHand(side);
+      if (point) return point;
+    }
     const hand =
       this.type === 'redking'
         ? this.node('hand.' + side)
@@ -164,6 +232,80 @@ export class MonsterMotion {
           ease(active.phase === 'windup' ? active.age / active.windup : 1) *
           fade
         : 0;
+    if (this.mmd) {
+      // Skeletal drive for the converted MMD kaiju: reset, then aim the real
+      // limb bones for the pose the current attack needs. Node names differ
+      // between the romanised and Japanese MMD rigs, so this.rig resolves them.
+      const rig = this.rig;
+      const aim = (from, to, direction) => {
+        if (from && to) this.aim(from.name, to.name, direction);
+      };
+      for (const [bone, rotation] of this.rest) bone.quaternion.copy(rotation);
+      this.root.updateWorldMatrix(true, true);
+      const gather = active ? ease(active.phase === 'windup' ? active.age / active.windup : 1) : 0;
+      const strike = active?.phase === 'flight' ? ease(active.age / active.flight) : 0;
+      const castSide = active?.safeSide > 0 ? 'L' : 'R';
+      const sign = castSide === 'L' ? 1 : -1;
+      for (const limb of ['L', 'R']) {
+        const out = limb === 'L' ? 1 : -1;
+        aim(rig.arm[limb], rig.fore[limb], V(out * 0.3, -1, 0.06));
+        aim(rig.fore[limb], rig.hand[limb], V(out * 0.14, -1, 0.12));
+      }
+      if (rig.neck)
+        this.turn(rig.neck.name, V(1, 0, 0), active?.kind === 'charge' ? 0.12 * gather : 0.05 * Math.sin(time * 1.7));
+      if (rig.chest) {
+        this.turn(rig.chest.name, V(1, 0, 0), 0.02 * Math.sin(time * 1.3));
+        this.turn(rig.chest.name, V(0, 1, 0), 0.03 * Math.sin(time * 0.9));
+      }
+      if (active) {
+        const arm = rig.arm[castSide];
+        const fore = rig.fore[castSide];
+        const hand = rig.hand[castSide];
+        if (active.kind === 'bolt' || active.kind === 'sweep') {
+          const raise = V(sign * 0.35, 0.55, -0.45).lerp(V(sign * 0.14, 0.12, 1), strike);
+          aim(arm, fore, raise.clone().lerp(V(sign * 0.3, -1, 0.06), Math.max(0, 1 - gather * 2)));
+          aim(fore, hand, raise);
+          if (rig.chest) this.turn(rig.chest.name, V(0, 1, 0), -sign * 0.25 * gather);
+        }
+        if (active.kind === 'melee') {
+          const punch = strike > 0 ? V(sign * 0.16, 0.12, 1) : V(sign * 0.4, 0.2, -0.7);
+          aim(arm, fore, punch);
+          aim(fore, hand, punch);
+          if (rig.chest) this.turn(rig.chest.name, V(0, 1, 0), -sign * 0.3 * strike * fade);
+        }
+        if (active.kind === 'charge') {
+          const lean = (active.phase === 'windup' ? gather : 1) * fade;
+          if (rig.hips) this.turn(rig.hips.name, V(1, 0, 0), 0.22 * lean);
+          if (rig.chest) this.turn(rig.chest.name, V(1, 0, 0), 0.18 * lean);
+          if (active.phase === 'flight')
+            for (const limb of ['L', 'R']) {
+              const direction = this.legRest.get(limb);
+              if (!direction) continue;
+              const stride = Math.sin(active.age * 14) * (limb === 'L' ? 0.4 : -0.4);
+              aim(
+                rig.thigh[limb],
+                rig.shin[limb],
+                direction.clone().applyAxisAngle(V(1, 0, 0), -stride),
+              );
+            }
+        }
+      }
+      if (this.tail.length) {
+        const life = dead ? 0 : 1;
+        this.tail.forEach((bone, index) => {
+          const ramp = (index + 1) / this.tail.length;
+          const phase = time * 1.6 - index * 0.7;
+          this.turn(bone.name, V(0, 1, 0), 0.03 * ramp * life * Math.sin(phase));
+          this.turn(bone.name, V(1, 0, 0), 0.018 * ramp * life * Math.cos(phase * 0.8));
+        });
+      }
+      if (hurt && rig.chest) this.turn(rig.chest.name, V(1, 0, 0), -0.16);
+      if (dead) {
+        if (rig.chest) this.turn(rig.chest.name, V(1, 0, 0), -0.5);
+        if (rig.hips) this.turn(rig.hips.name, V(1, 0, 0), -0.35);
+      }
+      return;
+    }
     if (this.type === 'redking') {
       for (const [bone, rotation] of this.rest) bone.quaternion.copy(rotation);
       this.root.updateWorldMatrix(true, true);

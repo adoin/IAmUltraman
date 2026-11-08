@@ -58,6 +58,15 @@
       "duration": 3.097,
       "bytes": 15413,
       "sha256": "2b5a76e931982e9b093f2639a313a39fb8c52bd2f227169c15ebc5c77979067e"
+    },
+    {
+      "key": "victory",
+      "text": "守护成功！怪兽全部退散，日落海湾的灯又亮起来了！",
+      "duration": 5.39,
+      "bytes": 172474,
+      "sha256": "f5e2bb7957eefb5640813a76765bdb1f3253b655a09884d431fbc651b82b0aba",
+      "engine": "microsoft-sapi-huihui-placeholder",
+      "note": "Placeholder voice so the celebration can be heard offline. Replace victory.wav with the Qwen3-TTS clip before release."
     }
   ]
 }

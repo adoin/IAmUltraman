@@ -6,5 +6,6 @@
   "low": "low.ogg",
   "push": "push.ogg",
   "block": "block.ogg",
-  "dodge": "dodge.ogg"
+  "dodge": "dodge.ogg",
+  "victory": "victory.wav"
 }

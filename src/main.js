@@ -24,7 +24,22 @@ function battleEvent(event){
   if(event.type==='wave'||event.type==='defeat')$('threat').hidden=true;
   if(event.type==='assets-ready'){$('load-status').textContent=state.workerReady?'海湾准备就绪':'场景已就绪，正在准备动作识别…';$('load-status').classList.toggle('ready',state.workerReady);}
   if(event.type==='load-error'||event.type==='graphics-lost'){$('load-status').textContent=event.type==='graphics-lost'?'画面连接中断，请刷新页面重试':'模型加载失败，请检查网络后刷新';$('welcome').hidden=false;$('start-camera').disabled=true;$('start-keyboard').disabled=true;}
-  if(event.type==='victory'||event.type==='over'){leaveBattleView();const win=event.type==='victory';$('pause-panel').querySelector('.little-tag').textContent=win?'你就是城市的光':'每一次尝试，都会更勇敢';$('pause-panel').querySelector('h2').textContent=win?'守护成功！':'小英雄，补充能量吧';$('pause-panel').querySelector('p').textContent=`收集了 ${event.stars} 颗守护星星。${win?'日落海湾为你欢呼！':'休息一下，再来挑战！'}`;$('resume').hidden=true;$('restart').textContent='再来一次 →';$('pause-panel').hidden=false;}
+  if(event.type==='victory'){showCelebration();}
+  if(event.type==='celebration-end'||event.type==='over')showResult(event.stars,event.type==='celebration-end');
+}
+function showCelebration(){
+  $('celebration').hidden=false;document.body.classList.add('celebrating');
+  $('threat').hidden=true;$('scene-status').textContent='怪兽全部退散，城市的灯又亮起来了';
+  say('守护成功！',2800);
+}
+function showResult(stars,win){
+  $('celebration').hidden=true;document.body.classList.remove('celebrating');
+  leaveBattleView();
+  const panel=$('pause-panel');
+  panel.querySelector('.little-tag').textContent=win?'你就是城市的光':'每一次尝试，都会更勇敢';
+  panel.querySelector('h2').textContent=win?'守护成功！':'小英雄，补充能量吧';
+  panel.querySelector('p').textContent=`收集了 ${stars} 颗守护星星。${win?'日落海湾为你欢呼！':'休息一下，再来挑战！'}`;
+  $('resume').hidden=true;$('restart').textContent='再来一次 →';panel.hidden=false;
 }
 let scene;
 try{scene=new BattleScene($('game'),battleEvent);}catch(error){scene=new BattleEngine(battleEvent);scene.ready=Promise.reject(error);scene.ready.catch(()=>{});$('load-status').textContent='无法开启 3D 画面，请启用浏览器硬件加速后刷新';$('start-camera').disabled=true;$('start-keyboard').disabled=true;}
@@ -32,7 +47,7 @@ function enterBattleView(){document.body.classList.add('in-battle');$('game').fo
 function leaveBattleView(){document.body.classList.remove('in-battle');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});scene.resize?.();}
 function log(text){state.debug.unshift(`${new Date().toLocaleTimeString()} ${text}`);state.debug=state.debug.slice(0,6);}
 async function start(){await audio.unlock();if(state.started)return;if(state.starting)return;state.starting=true;try{await scene.ready;if(pose.promise)await pose.promise.catch(()=>{});if(state.mode==='camera')await waitForInputFrame(state.epoch);state.started=true;enterBattleView();audio.setActive(true);scene.start();$('welcome').hidden=true;$('pause').hidden=false;$('scene-status').textContent='十字发光线 · 胸前交叉开护盾 · 侧身躲攻击';say('相信自己，相信光！');syncPause();}catch{$('load-status').textContent='游戏尚未准备好，请检查影像或刷新重试';}finally{state.starting=false;}}
-function syncPause(){scene.paused=state.manualPause||!!document.querySelector('dialog[open]')||document.hidden;audio.setActive(state.started&&!scene.paused&&!scene.finished);}
+function syncPause(){scene.paused=state.manualPause||!!document.querySelector('dialog[open]')||document.hidden;audio.setActive(state.started&&!scene.paused&&(!scene.finished||scene.celebrating>0));}
 function manualPause(value){if(!state.started||scene.finished)return;clearDefense();state.manualPause=value;if(value)leaveBattleView();else enterBattleView();$('pause-panel').hidden=!value;$('resume').hidden=false;$('pause-panel').querySelector('h2').textContent='小英雄休息中';$('pause-panel').querySelector('p').textContent='准备好了，就继续守护城市。';$('pause-panel').querySelector('.little-tag').textContent='补充一点光的力量';$('pause').textContent=value?'▶':'Ⅱ';$('pause').setAttribute('aria-label',value?'继续游戏':'暂停游戏');recognizer.reset();syncPause();}
 async function cast(skill,side='right'){audio.unlock();if(!state.started)await start();scene.cast(skill,side);}
 $('start-keyboard').onclick=()=>{if(video||state.pending||state.mode!=='keyboard')stopInput();return start();};
@@ -42,7 +57,7 @@ $('game').addEventListener('click',()=>{if(document.body.classList.contains('in-
 $('game').addEventListener('touchstart',e=>{if(e.touches.length>1&&document.body.classList.contains('in-battle')){e.preventDefault();manualPause(true);}},{passive:false});
 $('beam-button').onclick=()=>cast('beam');$('disc-button').onclick=()=>cast('disc');$('palm-button').onclick=()=>cast('palm');
 $('pause').onclick=()=>manualPause(!state.manualPause);$('resume').onclick=async()=>{if(pose.promise)await pose.promise.catch(()=>{});manualPause(false);};
-$('restart').onclick=async()=>{if(pose.promise)await pose.promise.catch(()=>{});clearDefense();$('threat').hidden=true;enterBattleView();audio.setActive(true);scene.start();state.manualPause=false;$('pause-panel').hidden=true;recognizer.reset();syncPause();say('新的冒险，出发！');};
+$('restart').onclick=async()=>{if(pose.promise)await pose.promise.catch(()=>{});clearDefense();$('threat').hidden=true;$('celebration').hidden=true;document.body.classList.remove('celebrating');enterBattleView();audio.setActive(true);scene.start();state.manualPause=false;$('pause-panel').hidden=true;recognizer.reset();syncPause();say('新的冒险，出发！');};
 const heldKeys=new Set(['a','d','l','arrowleft','arrowright']);
 const battleKeys=new Set([...heldKeys,'w','f','z','x','j','k','o','p','escape',' ']);
 function gameplayKey(event){

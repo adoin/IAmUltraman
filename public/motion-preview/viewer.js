@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BattleScene} from '../../src/scene.js';
 
@@ -9,22 +9,31 @@ const seek = document.querySelector('#seek');
 const stamp = document.querySelector('#stamp');
 const slow = document.querySelector('#slow');
 
+// ?model=<file.glb>&clip=<ActionName> previews any retargeted clip on the same rig.
+const query = new URLSearchParams(location.search);
+const modelFile = query.get('model') || 'tiga-punch.glb';
+const clipName = query.get('clip') || 'Punch_Cross';
+
 async function start() {
   const world = new BattleScene(canvas, () => {});
   const loader = new GLTFLoader();
-  const [, model] = await Promise.all([world.ready, loader.loadAsync('./tiga-punch.glb')]);
+  const [, model] = await Promise.all([world.ready, loader.loadAsync('./' + modelFile)]);
   world.renderer.setAnimationLoop(null);
   world.start();
   world.camera.visible = false;
   const actor = model.scene;
-  actor.position.set(0, 0, 20);
-  actor.rotation.y = Math.PI;
-  actor.scale.setScalar(3);
+  const bounds = new THREE.Box3().setFromObject(actor);
+  const size = bounds.getSize(new THREE.Vector3());
+  const uniform = 10 / Math.max(.001, size.y);
+  actor.scale.setScalar(uniform);
+  actor.position.set(0, -bounds.min.y * uniform, 20);
   world.renderScene.add(actor);
 
   const eye = actor.getObjectByName('EyeAnchor');
-  const clip = model.animations.find(animation => animation.name === 'Punch_Cross');
-  if (!eye || !clip) throw new Error('Missing eye camera or punch clip');
+  const clip = model.animations.find(animation => animation.name === clipName) || model.animations[0] || null;
+  const twoView = !!(eye && clip);
+  document.title = '迪迦 · ' + clipName;
+  document.querySelector('h1').textContent = '迪迦 · ' + clipName;
   const head = [];
   actor.traverse(node => {
     if (node.userData.hide_at_eye) head.push(node);
@@ -34,8 +43,8 @@ async function start() {
       node.receiveShadow = true;
     }
   });
-  const mixer = new THREE.AnimationMixer(actor);
-  mixer.clipAction(clip).play();
+  const mixer = clip ? new THREE.AnimationMixer(actor) : null;
+  if (mixer) mixer.clipAction(clip).play();
   const front = new THREE.PerspectiveCamera(35, 1, .035, 700);
   front.position.set(12, 5.3, 3.5);
   front.lookAt(0, 4.5, 20);
@@ -57,14 +66,20 @@ async function start() {
   }
 
   function render() {
-    mixer.setTime(Math.min(time, clip.duration - .00001));
+    if (mixer) mixer.setTime(Math.min(time, clip.duration - .00001));
     actor.updateMatrixWorld(true);
     const width = canvas.clientWidth, height = canvas.clientHeight;
     if (!width || !height) return;
+    renderer.shadowMap.needsUpdate = true;
+    if (!twoView) {
+      draw(front, 0, 0, width, height);
+      play.disabled = seek.disabled = true;
+      stamp.value = '静置姿势';
+      return;
+    }
     const stacked = matchMedia('(max-width:700px)').matches;
     const split = Math.floor((stacked ? height : width) / 2);
     head.forEach(node => { node.visible = true; });
-    renderer.shadowMap.needsUpdate = true;
     if (stacked) draw(front, 0, split, width, height - split);
     else draw(front, 0, 0, split, height);
 
@@ -97,7 +112,7 @@ async function start() {
   renderer.setAnimationLoop(now => {
     const dt = Math.min(Math.max((now - previous) / 1000, 0), .05);
     previous = now;
-    if (playing) time = (time + dt * (slow.checked ? .4 : 1)) % clip.duration;
+    if (playing && clip) time = (time + dt * (slow.checked ? .4 : 1)) % clip.duration;
     if (playing || dirty) render();
     dirty = false;
   });
@@ -107,3 +122,4 @@ start().catch(error => {
   console.error(error);
   status.textContent = '预览加载失败，请刷新重试。';
 });
+

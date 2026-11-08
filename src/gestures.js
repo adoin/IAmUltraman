@@ -14,7 +14,27 @@ function segmentsCross(a,b,c,d){
 /** Geometry uses image pixels (not normalized x/y) to preserve angles at any aspect ratio. */
 export class GestureRecognizer {
   constructor(){this.mode='easy';this.reset();}
-  reset(){this.palmSince=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
+  reset(){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
+  /**
+   * One palm pushed toward the camera, the other hand kept out of the way.
+   * Depth alone is noisy on cheap webcams, so a foreshortened straight arm
+   * (short 2D reach with forward depth) and the illustrated side reach both
+   * count. The spare hand only has to be bent, lowered or tucked in.
+   */
+  palmThrust(arm,scale,easy){
+    const straight=arm.angle>(easy?126:140);
+    const forward=(arm.s.z-arm.w.z)/scale;
+    const reach=length(arm.s,arm.w)/scale;
+    const lateral=Math.abs(arm.w.x-arm.s.x)/scale;
+    const height=(arm.w.y-arm.s.y)/scale;
+    const aimed=lateral<(easy?1.25:1.05)&&height<(easy?.55:.4)&&height>-(easy?.65:.45);
+    const pushed=forward>(easy?.09:.14)||(reach>(easy?1:1.15)&&forward>-(easy?.12:.06));
+    const otherBent=arm.otherAngle<(easy?158:150);
+    const otherLow=(arm.otherW.y-arm.otherS.y)/scale>(easy?.14:.28);
+    const otherTucked=Math.abs(arm.otherW.x-arm.otherS.x)/scale<(easy?.9:.65);
+    const spare=otherBent||otherLow||otherTucked;
+    return straight&&aimed&&pushed&&spare;
+  }
   update(points,time,width=640,height=480){
     const out={skill:null,skillSide:null,discPreparation:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；十字发光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,debug:{}};
     if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>900)) this.reset();
@@ -46,15 +66,28 @@ export class GestureRecognizer {
     if(guardPose){this.palmSince=null;this.palmFired=false;this.punchReady=[null,null];this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'已识别举臂防御':'胸前交叉双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
     this.guardSince=null;
     const extended=[elbowAngle(ls,le,lw),elbowAngle(rs,re,rw)];
-    const palmPose=!this.armed.some(Boolean)&&!cross&&[[ls,lw,rs,rw],[rs,rw,ls,lw]].some(([s,w,other,rest],i)=>extended[i]>150&&Math.abs(w.y-s.y)<scale*.3&&rest.y>other.y+scale*.5&&(s.z-w.z>scale*.15||length(s,w)>scale*.9));
-    if(palmPose){
+    const arms=[
+      {s:ls,e:le,w:lw,otherS:rs,otherE:re,otherW:rw,angle:extended[0],otherAngle:extended[1],side:'left'},
+      {s:rs,e:re,w:rw,otherS:ls,otherE:le,otherW:lw,angle:extended[1],otherAngle:extended[0],side:'right'},
+    ];
+    const palmArm=!this.armed.some(Boolean)&&!cross?arms.find(arm=>this.palmThrust(arm,scale,easy)):null;
+    const palmHold=easy?520:650;
+    let palmInfo;
+    if(palmArm){
       this.palmSince??=time;
+      this.palmLast=time;
       this.raise=[null,null];this.armed=[null,null];
-      out.charge=clamp((time-this.palmSince)/650,0,1);out.status='单掌前推，保持片刻…';
-      if(time-this.palmSince>=650&&!this.palmFired){out.skill='palm';out.status='手掌光箭！收回手臂再来一次';this.palmFired=true;this.punchReady=[null,null];return out;}
+      palmInfo={side:palmArm.side,forward:+((palmArm.s.z-palmArm.w.z)/scale).toFixed(2),reach:+(length(palmArm.s,palmArm.w)/scale).toFixed(2),angle:Math.round(palmArm.angle)};
+      out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='单掌向前推出，保持一下…';
+      if(time-this.palmSince>=palmHold&&!this.palmFired){out.skill='palm';out.status='手掌光箭！收回手臂再来一次';this.palmFired=true;this.punchReady=[null,null];return out;}
+    }else if(this.palmSince!==null&&time-(this.palmLast??time)<=240){
+      // A child's camera frame flickers. Keep the charge through short dropouts
+      // instead of restarting the whole dwell on one noisy frame.
+      out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='保持前推，别松手…';
     }else{this.palmSince=null;this.palmFired=false;}
     const hold=easy?420:600;
     out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,armed:this.armed.some(Boolean)};
+    if(palmInfo)out.debug.palm=palmInfo;
     if(cross&&!guardPose){
       this.crossSince??=time;
       out.charge=clamp((time-this.crossSince)/hold,0,1);out.status='保持十字姿势，凝聚光线…';
@@ -63,7 +96,7 @@ export class GestureRecognizer {
     }else{this.crossSince=null;this.crossFired=false;}
     const nose=p[0],headTop=visible(nose)&&nose.y<centerY-scale*.2?nose.y-scale*.4:centerY-scale*.65;
     for(let side=0;side<2;side++){
-      if(cross||guardPose||palmPose)continue;
+      if(cross||guardPose||palmArm)continue;
       const wrist=side===0?lw:rw,shoulder=side===0?ls:rs;
       const high=wrist.y<headTop-scale*.05&&angles[side]>50;
       const relative={x:(wrist.x-shoulder.x)/scale,y:(wrist.y-shoulder.y)/scale,z:(wrist.z-shoulder.z)/scale};
@@ -108,5 +141,5 @@ export class GestureRecognizer {
     candidates.sort((a,b)=>b.score-a.score);const side=candidates[0].side;
     out.punch=side===0?'left':'right';out.status=side===0?'左直拳！收拳后继续':'右直拳！收拳后继续';this.punchLast[side]=time;this.punchReady[side]=null;
   }
-  lost(out){this.palmSince=null;this.palmFired=false;this.punchReady=[null,null];this.crossSince=null;this.crossFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
+  lost(out){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.punchReady=[null,null];this.crossSince=null;this.crossFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
 }

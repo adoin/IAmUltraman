@@ -50,6 +50,7 @@ export class GameAudio {
   setMusicFile(file){this.musicElement?.pause();if(this.musicURL)URL.revokeObjectURL(this.musicURL);this.musicURL=file?URL.createObjectURL(file):null;this.musicElement=file?new Audio(this.musicURL):null;if(this.musicElement)this.musicElement.loop=true;this.nextBeat=0;this.syncMusic();}
   stopVoice(){if(this.voiceSource){try{this.voiceSource.stop();}catch{}this.voiceSource=null;}this.voicePriority=0;this.syncMusic();}
   speak(name,priority=1,cooldown=8){if(!this.context||!this.active||!this.enabled||!this.voiceEnabled)return false;const a=this.context,buffer=this.voices.get(name);if(!buffer||a.currentTime-(this.voiceHistory.get(name)??-100)<cooldown||this.voiceSource&&this.voicePriority>=priority)return false;this.stopVoice();const source=a.createBufferSource();source.buffer=buffer;source.connect(this.voiceGain);this.voiceSource=source;this.voicePriority=priority;this.voiceHistory.set(name,a.currentTime);this.musicGain.gain.setTargetAtTime(.045,a.currentTime,.06);if(this.musicElement)this.musicElement.volume=.07;source.onended=()=>{if(this.voiceSource===source){this.voiceSource=null;this.voicePriority=0;this.syncMusic();}};source.start();return true;}
+  fanfare(){if(!this.enabled||!this.context||!this.active)return;const now=this.context.currentTime;[587.33,739.99,880,1174.66,880,1174.66].forEach((frequency,index)=>this.note(frequency,.44,.16,'triangle',now+index*.13,this.fxGain));this.noise(.6,.13,6500,now);}
   event(event,battle){
     if(event.type==='wave'){this.ended=false;this.syncMusic();this.finisherWave=0;this.speak('start',2,0);}
     if(event.type==='punch')this.effect('punch',event.side);
@@ -62,9 +63,9 @@ export class GameAudio {
     if(event.type==='defense'&&event.outcome==='dodge')this.speak('dodge',1,15);
     if(event.type==='knockback'){this.effect('hit');this.speak('push',1,12);}
     if(event.type==='defeat'){this.effect('win');}
-    if(event.type==='victory'||event.type==='over'){this.ended=true;this.syncMusic();}
-    if(event.type==='victory')this.effect('win');
-    if(event.type==='over')this.speak('hurt1',4,0);
+    if(event.type==='victory'){this.fanfare();this.speak('victory',5,0);this.ended=false;this.syncMusic();}
+    if(event.type==='celebration-end'){this.ended=true;this.syncMusic();}
+    if(event.type==='over'){this.ended=true;this.syncMusic();this.speak('hurt1',4,0);}
   }
   update(b){if(!this.active||b.paused||!b.playing||b.finished||b.defeated)return;
     if(b.enemyDistance>=26&&b.monsterHealth<=46&&b.monsterHealth>0&&b.time-b.lastCast.beam>=3.2&&!b.effects.some(e=>e.kind!=='punch')&&this.finisherWave!==b.wave){if(this.speak('finish',3,0))this.finisherWave=b.wave;}

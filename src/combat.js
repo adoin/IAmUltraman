@@ -1,15 +1,39 @@
 import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
 export const WAVES = [
   {name:'雷德王',model:'redking',title:'海湾入侵者',hp:110,color:0xffcb7a,attacks:['bolt','charge','slam']},
-  {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:145,color:0x68d9ff,attacks:['bolt','charge','sweep']},
-  {name:'加恩Q',model:'ganq',title:'巨眼的凝视',hp:175,color:0xee596d,attacks:['bolt','sweep','charge']},
-  {name:'巴尔坦星人 · 强袭',model:'baltan',title:'幻影突袭',hp:200,color:0x62cfff,attacks:['sweep','bolt','charge']},
-  {name:'巴尔坦星人 · 决战',model:'baltan',title:'最终守护战',hp:290,color:0xff8960,attacks:['bolt','sweep','charge']},
+  {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:140,color:0x68d9ff,attacks:['bolt','charge','sweep']},
+  {name:'巴尔坦星人 · 量产型',model:'baltan-basic',title:'分身战术',hp:160,color:0x5fd0ff,attacks:['bolt','sweep','charge']},
+  {name:'加恩Q',model:'ganq',title:'巨眼的凝视',hp:180,color:0xee596d,attacks:['bolt','sweep','charge']},
+  {name:'美菲拉斯星人',model:'mefilas',title:'幻影突袭',hp:195,color:0x62cfff,attacks:['sweep','bolt','charge']},
+  {name:'巴尔坦星人 · 强化体',model:'baltan-powered',title:'能量增幅',hp:215,color:0x7ee0ff,attacks:['bolt','charge','sweep']},
+  {name:'机械巴尔坦',model:'baltan-mecha',title:'改造追击者',hp:235,color:0x9ad7e8,attacks:['sweep','bolt','charge']},
+  {name:'卡欧斯 · 赛文',model:'chaos-seven',title:'暗影头镖',hp:255,color:0xdc7bff,attacks:['bolt','sweep','charge']},
+  {name:'卡欧斯 · 泰罗',model:'chaos-taro',title:'暗之王冠',hp:275,color:0xff9a7b,attacks:['sweep','bolt','charge']},
+  {name:'卡欧斯 · 奥特曼',model:'chaos-ultraman',title:'光之逆影',hp:295,color:0xc7a6ff,attacks:['bolt','charge','sweep']},
+  {name:'杰顿',model:'zetton',title:'宇宙恐龙',hp:320,color:0xff7a5c,attacks:['bolt','sweep','charge']},
+  {name:'机械哥莫拉',model:'gomora-mecha',title:'钢铁咆哮',hp:340,color:0xffb066,attacks:['slam','bolt','charge']},
+  {name:'迦拉克隆',model:'galactron',title:'最终守护战',hp:380,color:0x7fe7ff,attacks:['sweep','bolt','slam']},
 ];
 export const SKILLS={palm:{cooldown:2.2,damage:20,impact:.34,duration:.72},beam:{cooldown:3.2,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},disc:{cooldown:1.65,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
 export const PUNCH={cooldown:.28,damage:12,impact:.18,duration:.36};
 export const SHIELD=Object.freeze({duration:2,cooldown:4,drain:10,recharge:14,blockCost:12});
-export const MONSTER_ATTACK_NAMES={redking:{bolt:'岩石投掷',slam:'震地跺脚',melee:'近身直拳',charge:'蛮力冲锋'},baltan:{bolt:'钳爪光弹',sweep:'钳爪光线',melee:'钳爪突刺',charge:'幻影突进'},ganq:{bolt:'巨眼光弹',sweep:'巨眼射线',melee:'巨眼撞击',charge:'巨眼突进'}};
+/** The final monster defeat hands the screen to the victory dance before results. */
+export const CELEBRATION=Object.freeze({duration:7.5});
+export const MONSTER_ATTACK_NAMES={
+  redking:{bolt:'岩石投掷',slam:'震地跺脚',melee:'近身直拳',charge:'蛮力冲锋'},
+  baltan:{bolt:'钳爪光弹',sweep:'钳爪光线',melee:'钳爪突刺',charge:'幻影突进'},
+  'baltan-basic':{bolt:'分身光弹',sweep:'分身光线',melee:'钳爪突刺',charge:'影分身突进'},
+  ganq:{bolt:'巨眼光弹',sweep:'巨眼射线',melee:'巨眼撞击',charge:'巨眼突进'},
+  mefilas:{bolt:'星人光弹',sweep:'星人射线',melee:'星人直拳',charge:'瞬移突进'},
+  'baltan-powered':{bolt:'强化光弹',sweep:'增幅光线',melee:'钳爪猛击',charge:'能量冲锋'},
+  'baltan-mecha':{bolt:'机械光弹',sweep:'切割光线',melee:'钢爪突刺',charge:'推进冲锋'},
+  'chaos-seven':{bolt:'艾梅利姆光弹',sweep:'头镖横扫',melee:'暗影格斗拳',charge:'暗影突进'},
+  'chaos-taro':{bolt:'宇宙光弹',sweep:'王者射线',melee:'宇宙拳击',charge:'王冠冲锋'},
+  'chaos-ultraman':{bolt:'斯派修姆光弹',sweep:'逆光斯派修姆',melee:'奥特拳',charge:'高速突进'},
+  'gomora-mecha':{bolt:'机械光线',sweep:'超振动波',melee:'机械重拳',charge:'蛮力冲锋'},
+  zetton:{bolt:'一兆度火球',sweep:'杰顿光线',melee:'能量拳',charge:'瞬移突进'},
+  galactron:{bolt:'迦拉克隆光线',sweep:'重力冲击波',melee:'巨体重击',charge:'暴走冲锋'},
+};
 export const ATTACKS={
   melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:1.0,flight:.3},
   bolt:{name:'能量弹',hint:'向左右侧身躲开，或胸前交叉双臂防御',damage:14,windup:2.2,flight:1.15},
@@ -21,7 +45,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /** Deterministic combat simulation, independent of rendering and camera inference. */
 export class BattleEngine {
   constructor(onEvent=()=>{}){this.onEvent=onEvent;this.difficulty='easy';this.practice=false;this.reset();}
-  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
+  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
   get waveInfo(){return WAVES[this.wave-1];}
   start(){this.reset();this.playing=true;this.onEvent({type:'wave',wave:1,info:this.waveInfo});}
   emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,monsterHP:this.monsterHealth,monsterMax:this.monsterMax,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}
@@ -96,10 +120,17 @@ export class BattleEngine {
     this.attack=null;this.nextAttack=this.difficulty==='normal'?3.5:4.5;this.emit();
     if(this.heroHealth===0){this.finished=true;this.onEvent({type:'over',stars:this.stars,stats:{...this.stats}});}
   }
-  update(dt){if(!this.playing||this.paused||this.finished||dt<=0)return;this.time+=dt;this.updateShield(dt);this.updateDistance(dt);
+  update(dt){if(!this.playing||this.paused||dt<=0)return;
+    if(this.celebrating>0){
+      this.time+=dt;this.celebrating=Math.max(0,this.celebrating-dt);
+      if(this.celebrating===0)this.onEvent({type:'celebration-end',stars:this.stars,stats:{...this.stats}});
+      return;
+    }
+    if(this.finished)return;
+    this.time+=dt;this.updateShield(dt);this.updateDistance(dt);
     for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=(effect.impact??config.impact)){effect.hit=true;this.damage(config.damage,effect.kind,effect.side);}}
     this.effects=this.effects.filter(e=>e.age<e.duration);
-    if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=5;this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
+    if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.celebrating=CELEBRATION.duration;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=5;this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
     if(this.attack){this.attack.age+=dt;if(this.attack.phase==='windup'&&this.attack.age>=this.attack.windup){this.attack.phase='flight';this.attack.age=0;this.attack.startDistance=this.enemyDistance;this.onEvent({type:'enemy-cast',attack:{...this.attack}});}else if(this.attack.phase==='flight'&&this.attack.age>=this.attack.flight)this.resolveAttack();}
     else{this.nextAttack-=dt;if(this.nextAttack<=0){const attacks=this.waveInfo.attacks;const kind=this.inMelee?'melee':attacks[this.attackIndex%attacks.length];this.attackIndex++;this.beginAttack(kind);}}
   }
