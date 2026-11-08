@@ -8,29 +8,29 @@
    "model": "baltan",
    "kind": "bolt",
    "name": "白色破坏光弹",
-   "idleWindup": 0.609,
-   "idleFlight": 0.593
+   "idleWindup": 0.608,
+   "idleFlight": 0.592
   },
   {
    "model": "baltan",
    "kind": "charge",
    "name": "分身突进",
    "idleWindup": 0.354,
-   "idleFlight": 0.386
+   "idleFlight": 0.385
   },
   {
    "model": "baltan",
    "kind": "sweep",
    "name": "冷冻光线",
-   "idleWindup": 0.744,
-   "idleFlight": 0.697
+   "idleWindup": 0.742,
+   "idleFlight": 0.695
   },
   {
    "model": "baltan",
    "kind": "melee",
    "name": "巴尔坦钳爪突刺",
-   "idleWindup": 0.499,
-   "idleFlight": 0.329
+   "idleWindup": 0.498,
+   "idleFlight": 0.328
   },
   {
    "model": "mefilas",
@@ -270,56 +270,56 @@
    "a": "baltan",
    "b": "mefilas",
    "windup": 0.265,
-   "flight": 0.197
+   "flight": 0.198
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "chaos-seven",
-   "windup": 0.512,
-   "flight": 0.473
+   "windup": 0.511,
+   "flight": 0.472
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "chaos-taro",
    "windup": 0.667,
-   "flight": 0.206
+   "flight": 0.208
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "chaos-ultraman",
-   "windup": 0.319,
-   "flight": 0.498
+   "windup": 0.32,
+   "flight": 0.499
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "zetton",
-   "windup": 0.292,
-   "flight": 0.336
+   "windup": 0.293,
+   "flight": 0.333
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "gomora-mecha",
-   "windup": 0.533,
+   "windup": 0.532,
    "flight": 0.511
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "galactron",
-   "windup": 0.47,
-   "flight": 0.416
+   "windup": 0.469,
+   "flight": 0.417
   },
   {
    "kind": "bolt",
    "a": "baltan",
    "b": "gatanothor",
-   "windup": 0.171,
-   "flight": 0.268
+   "windup": 0.172,
+   "flight": 0.27
   },
   {
    "kind": "bolt",
@@ -521,57 +521,57 @@
    "kind": "sweep",
    "a": "baltan",
    "b": "mefilas",
-   "windup": 0.437,
-   "flight": 0.419
+   "windup": 0.436,
+   "flight": 0.418
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "chaos-seven",
-   "windup": 0.251,
-   "flight": 0.4
+   "windup": 0.253,
+   "flight": 0.401
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "chaos-taro",
    "windup": 0.504,
-   "flight": 0.542
+   "flight": 0.541
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "chaos-ultraman",
-   "windup": 0.537,
-   "flight": 0.546
+   "windup": 0.536,
+   "flight": 0.544
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "zetton",
    "windup": 0.201,
-   "flight": 0.309
+   "flight": 0.308
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "gomora-mecha",
-   "windup": 0.694,
-   "flight": 0.594
+   "windup": 0.69,
+   "flight": 0.592
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "galactron",
-   "windup": 0.735,
-   "flight": 0.672
+   "windup": 0.733,
+   "flight": 0.67
   },
   {
    "kind": "sweep",
    "a": "baltan",
    "b": "gatanothor",
-   "windup": 0.476,
-   "flight": 0.286
+   "windup": 0.474,
+   "flight": 0.284
   },
   {
    "kind": "sweep",
@@ -794,57 +794,57 @@
    "kind": "melee",
    "a": "baltan",
    "b": "mefilas",
-   "windup": 0.439,
-   "flight": 0.227
+   "windup": 0.437,
+   "flight": 0.228
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "chaos-seven",
-   "windup": 0.197,
-   "flight": 0.431
+   "windup": 0.199,
+   "flight": 0.433
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "chaos-taro",
-   "windup": 0.434,
-   "flight": 0.486
+   "windup": 0.436,
+   "flight": 0.488
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "chaos-ultraman",
-   "windup": 0.466,
+   "windup": 0.465,
    "flight": 0.241
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "zetton",
-   "windup": 0.429,
-   "flight": 0.232
+   "windup": 0.426,
+   "flight": 0.231
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "gomora-mecha",
-   "windup": 0.693,
-   "flight": 0.417
+   "windup": 0.692,
+   "flight": 0.419
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "galactron",
-   "windup": 0.649,
-   "flight": 0.4
+   "windup": 0.648,
+   "flight": 0.401
   },
   {
    "kind": "melee",
    "a": "baltan",
    "b": "gatanothor",
-   "windup": 0.572,
-   "flight": 0.325
+   "windup": 0.571,
+   "flight": 0.326
   },
   {
    "kind": "melee",
