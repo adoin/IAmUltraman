@@ -211,8 +211,8 @@
    "model": "galactron",
    "kind": "bolt",
    "name": "迦拉克隆光线",
-   "idleWindup": 0.555,
-   "idleFlight": 0.554
+   "idleWindup": 0.427,
+   "idleFlight": 0.307
   },
   {
    "model": "galactron",
@@ -311,8 +311,8 @@
    "kind": "bolt",
    "a": "baltan",
    "b": "galactron",
-   "windup": 0.33,
-   "flight": 0.377
+   "windup": 0.47,
+   "flight": 0.416
   },
   {
    "kind": "bolt",
@@ -360,8 +360,8 @@
    "kind": "bolt",
    "a": "mefilas",
    "b": "galactron",
-   "windup": 0.437,
-   "flight": 0.42
+   "windup": 0.277,
+   "flight": 0.367
   },
   {
    "kind": "bolt",
@@ -402,8 +402,8 @@
    "kind": "bolt",
    "a": "chaos-seven",
    "b": "galactron",
-   "windup": 0.526,
-   "flight": 0.528
+   "windup": 0.516,
+   "flight": 0.429
   },
   {
    "kind": "bolt",
@@ -437,8 +437,8 @@
    "kind": "bolt",
    "a": "chaos-taro",
    "b": "galactron",
-   "windup": 0.757,
-   "flight": 0.251
+   "windup": 0.441,
+   "flight": 0.327
   },
   {
    "kind": "bolt",
@@ -465,8 +465,8 @@
    "kind": "bolt",
    "a": "chaos-ultraman",
    "b": "galactron",
-   "windup": 0.157,
-   "flight": 0.644
+   "windup": 0.596,
+   "flight": 0.69
   },
   {
    "kind": "bolt",
@@ -486,8 +486,8 @@
    "kind": "bolt",
    "a": "zetton",
    "b": "galactron",
-   "windup": 0.478,
-   "flight": 0.322
+   "windup": 0.437,
+   "flight": 0.276
   },
   {
    "kind": "bolt",
@@ -500,8 +500,8 @@
    "kind": "bolt",
    "a": "gomora-mecha",
    "b": "galactron",
-   "windup": 0.508,
-   "flight": 0.476
+   "windup": 0.425,
+   "flight": 0.381
   },
   {
    "kind": "bolt",
@@ -514,8 +514,8 @@
    "kind": "bolt",
    "a": "galactron",
    "b": "gatanothor",
-   "windup": 0.263,
-   "flight": 0.156
+   "windup": 0.436,
+   "flight": 0.403
   },
   {
    "kind": "sweep",

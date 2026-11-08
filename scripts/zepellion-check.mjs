@@ -1,20 +1,27 @@
 /**
  * Camera-free proof of the Zepellion pre-motion.
  *
- * 1. Samples the first-person hands during the gather beat and during the same
- *    moment of the Mebium ray, and asserts the two poses are different.
- * 2. Saves gather / form / fire frames to artifacts/poses/.
+ * 1. Samples the first-person hands at each of the three wind-up beats (reach,
+ *    pull, cross) and compares them with the Mebium ray's ready pose.
+ * 2. Saves reach / pull / cross / fire frames to artifacts/poses/.
  * 3. Drives the HUD stage and asserts the card text mentions the gather.
  */
 import {chromium} from 'playwright';
 import {mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
+import {ZEPELLION_TIMING} from '../src/action-timing.js';
 
 const base = process.env.GAME_URL || 'http://127.0.0.1:4173';
 const out = 'artifacts/poses';
 mkdirSync(out, {recursive: true});
 const DIFFERENCE = 0.12; // world units between the two hand rigs' poses
+const {reach, pull, cross, fire, lightEnd, end} = ZEPELLION_TIMING;
+
+// The wind-up is only a three-beat motion if the beats are ordered and spaced.
+assert.ok(reach < pull && pull < cross && cross <= fire, 'reach -> pull -> cross -> fire must be ordered');
+assert.ok(pull - reach >= 0.4 && cross - pull >= 0.4, 'each wind-up beat needs its own time');
+assert.ok(lightEnd > fire && end > lightEnd, 'the light must outlast the shot');
 
 const browser = await chromium.launch({channel: 'chrome', headless: true});
 const page = await browser.newPage({viewport: {width: 640, height: 420}});
@@ -61,22 +68,32 @@ const beam = await page.evaluate(() => window.__castThenSample('beam', [0.2, 0.3
 await page.evaluate(() => window.__label('梅特里姆光线 · 起手'));
 await page.screenshot({path: join(out, 'zepellion-beam-ready.jpg'), type: 'jpeg', quality: 74});
 
-// Zepellion: gather beat, the L form, then the shot.
-const zep = await page.evaluate(() => window.__castThenSample('zepellion', [0.3, 0.5, 0.64, 0.95, 1.2]));
-await page.evaluate(() => window.__label('哉佩利敖光线 · 聚气（双手在胸前合拢）'));
-await page.screenshot({path: join(out, 'zepellion-gather.jpg'), type: 'jpeg', quality: 74});
-await page.evaluate(() => window.__label('哉佩利敖光线 · L 形成形'));
-await page.screenshot({path: join(out, 'zepellion-form.jpg'), type: 'jpeg', quality: 74});
+// Zepellion: the three wind-up beats, then the shot.
+const zep = await page.evaluate(
+  ([r, p, c, f]) => window.__castThenSample('zepellion', [r, p, c, f]),
+  [reach, pull, cross, fire + 0.08],
+);
+await page.evaluate(() => window.__label('哉佩利敖光线 ①伸臂'));
+await page.screenshot({path: join(out, 'zepellion-reach.jpg'), type: 'jpeg', quality: 74});
+await page.evaluate(() => window.__label('哉佩利敖光线 ②横拉'));
+await page.screenshot({path: join(out, 'zepellion-pull.jpg'), type: 'jpeg', quality: 74});
+await page.evaluate(() => window.__label('哉佩利敖光线 ③摆十字'));
+await page.screenshot({path: join(out, 'zepellion-cross.jpg'), type: 'jpeg', quality: 74});
 await page.evaluate(() => window.__label('哉佩利敖光线 · 发射'));
 await page.screenshot({path: join(out, 'zepellion-fire.jpg'), type: 'jpeg', quality: 74});
 
 const beamReady = flat([beam[1]])[0];
-const zepGather = flat([zep[1]])[0];
-const zepForm = flat([zep[2]])[0];
-const gatherVsBeam = distance(zepGather, beamReady);
-const formVsBeam = distance(zepForm, beamReady);
-assert.ok(gatherVsBeam >= DIFFERENCE, `the gather pose must differ from the Mebium ready pose (${gatherVsBeam.toFixed(3)})`);
-assert.ok(formVsBeam >= DIFFERENCE / 2, `the L form must differ from the Mebium pose (${formVsBeam.toFixed(3)})`);
+const zepReach = flat([zep[0]])[0];
+const zepPull = flat([zep[1]])[0];
+const zepCross = flat([zep[2]])[0];
+const reachVsBeam = distance(zepReach, beamReady);
+const reachVsPull = distance(zepReach, zepPull);
+const pullVsCross = distance(zepPull, zepCross);
+const crossVsBeam = distance(zepCross, beamReady);
+assert.ok(reachVsBeam >= DIFFERENCE, `the reach beat must differ from the Mebium ready pose (${reachVsBeam.toFixed(3)})`);
+assert.ok(reachVsPull >= DIFFERENCE * 0.6, `the wide pull must move the arms (${reachVsPull.toFixed(3)})`);
+assert.ok(pullVsCross >= DIFFERENCE * 0.6, `the cross must snap out of the pull (${pullVsCross.toFixed(3)})`);
+assert.ok(crossVsBeam >= DIFFERENCE / 2, `the L form must differ from the Mebium pose (${crossVsBeam.toFixed(3)})`);
 
 // The HUD has to show the pre-motion stages without a camera.
 const hud = [];
@@ -93,5 +110,12 @@ assert.match(hud[1].text, /L\s*形/, `stage 2 HUD text was "${hud[1].text}"`);
 assert.match(hud[2].text, /就绪|冷却/, `stage 0 HUD text was "${hud[2].text}"`);
 assert.deepEqual(errors, [], 'no page errors while casting');
 
-console.log(JSON.stringify({ gatherVsBeam: +gatherVsBeam.toFixed(3), formVsBeam: +formVsBeam.toFixed(3), hud }, null, 1));
+console.log(JSON.stringify({
+  timing: {reach, pull, cross, fire},
+  reachVsBeam: +reachVsBeam.toFixed(3),
+  reachVsPull: +reachVsPull.toFixed(3),
+  pullVsCross: +pullVsCross.toFixed(3),
+  crossVsBeam: +crossVsBeam.toFixed(3),
+  hud,
+}, null, 1));
 await browser.close();

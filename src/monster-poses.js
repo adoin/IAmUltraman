@@ -223,8 +223,11 @@ export const MONSTER_MOVES = {
     bolt: {
       name: '迦拉克隆光线',
       emit: 'chest',
-      windup: { arms: { L: [0.85, 0.25, -0.35], R: [-0.85, 0.25, -0.35] }, chest: [-0.2, 0], head: [-0.1, 0] },
-      flight: { arms: { L: [0.9, 0.1, 0.35], R: [-0.9, 0.1, 0.35] }, chest: [0.12, 0], head: [0.05, 0] },
+      // Both hands frame the chest core and the hull leans back while it charges,
+      // then the arms are thrown outward-down as the core fires. (The old pose
+      // simply held both arms out sideways, which read as a rig T-pose.)
+      windup: { arms: { L: [0.24, -0.08, 0.62], R: [-0.24, -0.08, 0.62] }, chest: [-0.28, 0], head: [-0.18, 0], hips: [-0.08] },
+      flight: { arms: { L: [0.64, -0.72, 0.32], R: [-0.64, -0.72, 0.32] }, chest: [0.2, 0], head: [0.08, 0], hips: [0.1] },
     },
     sweep: {
       name: '重力冲击波',

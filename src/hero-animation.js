@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
+import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming} from './action-timing.js';
 import {ViewmodelLens} from './viewmodel-lens.js';
 
 const v=(x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
@@ -228,6 +228,16 @@ export class HeroAnimation {
     this.beamBase=this.beamPose(worldUp,0);
     this.beam=this.beamPose(worldUp);
     this.gather=this.gatherPose();
+    // Zepellion's slow three-beat wind-up. Beat 1 pushes both arms straight
+    // forward, beat 2 drags the forearms wide (the "draw"), beat 3 snaps into
+    // the photonic cross held in beamBase.
+    // Both beats have to stay inside the first-person frustum: the mount sits
+    // ~0.2 units in front of the eye and each arm is ~2.25 long, so a fully
+    // lateral sweep would throw the hands off screen in the near plane. Beat 1
+    // pushes both palms forward until they nearly meet; beat 2 sweeps them wide
+    // (still forward) so the silhouette change reads as a horizontal draw.
+    this.zepReach=[-1,1].map(sign=>state(v(sign*.08,-.14,-.99),v(-sign*.32,.06,-.94),v(0,1,0),'blade',v(-sign*.30,.05,-.95)));
+    this.zepPull=[-1,1].map(sign=>state(v(sign*.30,-.14,-.95),v(sign*.26,.22,-.94),v(0,1,0),'blade',v(sign*.24,.20,-.95)));
   }
 
   beamPose(up,lead=1){
@@ -367,24 +377,40 @@ export class HeroAnimation {
     let target;
     if(beam){
       this.syncBeamPose();
-      // Zepellion carries its own three-beat timing; the Mebium ray keeps BEAM_TIMING.
-      const timing=beam.timing||BEAM_TIMING, ultra=beam.kind==='zepellion';
+      // Zepellion carries its own slow three-beat timing (reach, pull, cross);
+      const ultra=beam.kind==='zepellion';
+      const timing=beam.timing||(ultra?ZEPELLION_TIMING:BEAM_TIMING);
       const t=beam.age;
-      const gatherEnd=ultra?(timing.gather??.55):timing.ready;
-      if(t<gatherEnd){
-        const phase=t/gatherEnd;
-        target=ultra
-          ?[blend(this.entry[0],this.gather[0],(phase-.12)/.88),blend(this.entry[1],this.gather[1],phase/.8)]
-          :[blend(this.entry[0],this.beamBase[0],(phase-.15)/.85),blend(this.entry[1],this.beamBase[1],phase/.76)];
-      }else if(ultra&&t<timing.form){
-        const phase=(t-gatherEnd)/(timing.form-gatherEnd);
-        target=[blend(this.gather[0],this.beamBase[0],phase),blend(this.gather[1],this.beamBase[1],phase/.85)];
-      }else if(t<timing.lightEnd){
-        const lead=clamp((t-gatherEnd)/.12,0,1);
-        target=lead<1?this.beamPose(this.beamUp,lead):this.beam;
+      if(ultra){
+        const [reach,pull,cross]=[this.zepReach,this.zepPull,this.beamBase];
+        if(t<timing.reach){
+          const phase=t/timing.reach;
+          target=[blend(this.entry[0],reach[0],phase),blend(this.entry[1],reach[1],phase*.92)];
+        }else if(t<timing.pull){
+          const phase=(t-timing.reach)/(timing.pull-timing.reach);
+          target=[blend(reach[0],pull[0],phase),blend(reach[1],pull[1],phase*.94)];
+        }else if(t<timing.cross){
+          const phase=(t-timing.pull)/(timing.cross-timing.pull);
+          target=[blend(pull[0],cross[0],phase),blend(pull[1],cross[1],phase*.9)];
+        }else if(t<timing.lightEnd){
+          const lead=clamp((t-timing.cross)/.16,0,1);
+          target=lead<1?this.beamPose(this.beamUp,lead):this.beam;
+        }else{
+          const phase=(t-timing.lightEnd)/(timing.end-timing.lightEnd);
+          target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
+        }
       }else{
-        const phase=(t-timing.lightEnd)/(timing.end-timing.lightEnd);
-        target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
+        const gatherEnd=timing.ready;
+        if(t<gatherEnd){
+          const phase=t/gatherEnd;
+          target=[blend(this.entry[0],this.beamBase[0],(phase-.15)/.85),blend(this.entry[1],this.beamBase[1],phase/.76)];
+        }else if(t<timing.lightEnd){
+          const lead=clamp((t-gatherEnd)/.12,0,1);
+          target=lead<1?this.beamPose(this.beamUp,lead):this.beam;
+        }else{
+          const phase=(t-timing.lightEnd)/(timing.end-timing.lightEnd);
+          target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
+        }
       }
     }else if(palm){
       const poses=this.neutral.map(copyPose);

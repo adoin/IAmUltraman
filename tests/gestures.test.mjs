@@ -103,7 +103,8 @@ test('the Zepellion dwell is at least 1.5x the Mebium dwell and the ray needs mo
   assert.ok(POSE_HOLDS.gatherEasy>0&&POSE_HOLDS.gatherNormal>POSE_HOLDS.gatherEasy);
   assert.ok(ZEPELLION_TIMING.ready>=BEAM_TIMING.ready*1.5,'the Zepellion ready phase must be longer');
   assert.ok(ZEPELLION_TIMING.impact>=BEAM_TIMING.impact+.2,'contact must land later than the Mebium ray');
-  assert.ok(ZEPELLION_TIMING.gather<ZEPELLION_TIMING.form&&ZEPELLION_TIMING.form<=ZEPELLION_TIMING.fire);
+  assert.ok(ZEPELLION_TIMING.reach<ZEPELLION_TIMING.pull&&ZEPELLION_TIMING.pull<ZEPELLION_TIMING.cross&&ZEPELLION_TIMING.cross<=ZEPELLION_TIMING.fire,'the wind-up must read as reach -> pull -> cross before the shot');
+  assert.ok(ZEPELLION_TIMING.pull-ZEPELLION_TIMING.reach>=.4&&ZEPELLION_TIMING.cross-ZEPELLION_TIMING.pull>=.4,'every wind-up beat needs its own beat of time');
 });
 test('a waist-high spare hand with a forward arm is enough for the palm sword',()=>{
   const pose=coords=>{const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;};

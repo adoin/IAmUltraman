@@ -41,8 +41,19 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /** Deterministic combat simulation, independent of rendering and camera inference. */
 export class BattleEngine {
   constructor(onEvent=()=>{}){this.onEvent=onEvent;this.difficulty='easy';this.practice=false;this.reset();}
-  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,zepellion:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
+  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,zepellion:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=this.attackDelay();this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
   get waveInfo(){return WAVES[this.wave-1];}
+  /**
+   * How long the monster waits between attacks. Later waves stop standing
+   * around: wave 1 leaves the player ~3.9s of room, the final wave only ~1.5s.
+   * The wait is measured after the previous attack resolves, so the whole
+   * cycle also includes the wind-up and flight.
+   */
+  attackDelay(){
+    const normal=this.difficulty==='normal';
+    const ramp=Math.min(2.4,(this.wave-1)*0.24);
+    return Math.max(normal?1.25:1.5,(normal?3.3:3.9)-ramp);
+  }
   start(){this.reset();this.playing=true;this.onEvent({type:'wave',wave:1,info:this.waveInfo});}
   emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,monsterHP:this.monsterHealth,monsterMax:this.monsterMax,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}
   get inMelee(){return this.enemyDistance<=18;}
@@ -97,12 +108,12 @@ export class BattleEngine {
       if(!this.inMelee)return;
       this.meleeHits++;
       if(this.meleeHits>=3){
-        this.meleeHits=0;this.knockdowns++;this.retreatTarget=this.knockdowns%2===0?43:35;this.retreatUntil=this.time+1;this.attack=null;this.nextAttack=3;
+        this.meleeHits=0;this.knockdowns++;this.retreatTarget=this.knockdowns%2===0?43:35;this.retreatUntil=this.time+1;this.attack=null;this.nextAttack=Math.max(1.2,this.attackDelay()-0.6);
         this.onEvent({type:'knockback',airborne:this.knockdowns%2===0});
       }
     }
     this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount,source,side});
-    if(this.attack&&this.attack.phase==='windup'&&amount>=40){this.attack=null;this.nextAttack=2.5;this.onEvent({type:'interrupt'});}
+    if(this.attack&&this.attack.phase==='windup'&&amount>=40){this.attack=null;this.nextAttack=Math.min(2.5,this.attackDelay());this.onEvent({type:'interrupt'});}
     if(this.monsterHealth===0){this.lowerShield();this.defeated=true;this.attack=null;this.stars+=3+this.wave;this.respawn=3;this.heroHealth=Math.min(100,this.heroHealth+15);this.guardEnergy=Math.min(100,this.guardEnergy+30);this.onEvent({type:'defeat',wave:this.wave});}this.emit();}
   beginAttack(kind){if(this.defeated||this.finished||this.attack)return;if(this.time<this.retreatUntil)return;const config=ATTACKS[kind];const fast=this.difficulty==='normal'?.8:1;this.attack={kind,name:MONSTER_ATTACK_NAMES[this.waveInfo.model]?.[kind]||config.name,phase:'windup',age:0,windup:config.windup*fast,flight:config.flight,originLean:this.lean,safeSide:this.attackIndex%2?-1:1};this.onEvent({type:'telegraph',attack:{...this.attack},config:{...config,name:this.attack.name}});}
   resolveAttack(){const attack=this.attack;if(!attack)return;const config=ATTACKS[attack.kind];let outcome='hit';
@@ -113,7 +124,7 @@ export class BattleEngine {
     else outcome='practice';
     this.onEvent({type:'defense',outcome,kind:attack.kind});
     if(outcome==='hit'&&!this.practice)this.onEvent({type:'attacked'});
-    this.attack=null;this.nextAttack=this.difficulty==='normal'?3.5:4.5;this.emit();
+    this.attack=null;this.nextAttack=this.attackDelay();this.emit();
     if(this.heroHealth===0){this.finished=true;this.onEvent({type:'over',stars:this.stars,stats:{...this.stats}});}
   }
   update(dt){if(!this.playing||this.paused||dt<=0)return;
@@ -126,7 +137,7 @@ export class BattleEngine {
     this.time+=dt;this.updateShield(dt);this.updateDistance(dt);
     for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=(effect.impact??config.impact)){effect.hit=true;this.damage(config.damage,effect.kind,effect.side);}}
     this.effects=this.effects.filter(e=>e.age<e.duration);
-    if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.celebrating=CELEBRATION.duration;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=5;this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
+    if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.celebrating=CELEBRATION.duration;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=this.attackDelay()+1;this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
     if(this.attack){this.attack.age+=dt;if(this.attack.phase==='windup'&&this.attack.age>=this.attack.windup){this.attack.phase='flight';this.attack.age=0;this.attack.startDistance=this.enemyDistance;this.onEvent({type:'enemy-cast',attack:{...this.attack}});}else if(this.attack.phase==='flight'&&this.attack.age>=this.attack.flight)this.resolveAttack();}
     else{this.nextAttack-=dt;if(this.nextAttack<=0){const attacks=this.waveInfo.attacks;const kind=this.inMelee?'melee':attacks[this.attackIndex%attacks.length];this.attackIndex++;this.beginAttack(kind);}}
   }

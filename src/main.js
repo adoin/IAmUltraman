@@ -198,4 +198,4 @@ requestAnimationFrame(detectLoop);
 makeWorker().catch(()=>{});
 window.addEventListener('pagehide',()=>{audio.setActive(false);stopInput({dispose:true});});
 window.addEventListener('pageshow',e=>{if(e.persisted)makeWorker().catch(()=>{});});
-export {scene as battle};
+export {scene as battle,audio};

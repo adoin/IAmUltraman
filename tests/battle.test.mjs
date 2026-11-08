@@ -58,7 +58,7 @@ test('crossing into melee cancels an unlanded remote attack',()=>{const{scene:s,
 
 test('a charge moves over its complete flight and reaches melee at impact',()=>{const{scene:s}=battle();s.nextAttack=100;s.beginAttack('charge');while(s.attack.phase==='windup')s.update(.01);const flight=s.attack.flight;s.update(flight/2);assert.ok(s.enemyDistance>24);assert.equal(s.heroHealth,100);s.update(flight/2);assert.ok(Math.abs(s.enemyDistance-16.5)<.001);assert.equal(s.heroHealth,78);});
 
-test('the first wave opens with a visible ranged attack before charging',()=>{const{scene:s}=battle();s.update(3.6);assert.equal(s.attack.kind,'bolt');assert.equal(s.attack.name,'岩石投掷');assert.equal(s.inMelee,false);});
+test('the first wave opens with a visible ranged attack before charging',()=>{const{scene:s}=battle();s.update(s.attackDelay()+.05);assert.equal(s.attack.kind,'bolt');assert.equal(s.attack.name,'岩石投掷');assert.equal(s.inMelee,false);});
 
 test('a prepared left disc uses the short throw timeline, stores hand and cancels preview',()=>{const b=new BattleEngine();b.start();b.setDiscPreparation({side:'left',progress:1,armed:true});assert.equal(b.cast('disc','left'),true);const e=b.effects[0];assert.equal(e.prepared,true);assert.equal(e.side,'left');assert.equal(b.discGesture,null);b.update(.57);assert.equal(b.monsterHealth,110);b.update(.02);assert.equal(b.monsterHealth,79);});
 
@@ -96,4 +96,20 @@ test('the final wave is Gatanothor, then Galactron and Zetton, then the Baltan f
     if(index===0) continue;
     assert.ok(WAVES[index].hp>WAVES[index-1].hp,`${model} must lift its wave above the previous one`);
   }
+});
+
+test('later waves attack sooner: the monster stops standing around',()=>{
+  const {scene: s} = battle();
+  const delays = WAVES.map((_, index) => { s.wave = index + 1; return s.attackDelay(); });
+  for (let i = 1; i < delays.length; i++) {
+    assert.ok(delays[i] <= delays[i - 1], `wave ${i + 1} must not wait longer than wave ${i}`);
+  }
+  assert.ok(delays[0] >= 3.6, `wave 1 should give the player room to learn (${delays[0]})`);
+  assert.ok(delays.at(-1) <= 1.6, `the last wave must press the attack (${delays.at(-1)})`);
+  assert.ok(delays[0] - delays.at(-1) >= 2.2, 'the ramp has to be felt, not just measurable');
+  s.difficulty = 'normal';
+  const normal = WAVES.map((_, index) => { s.wave = index + 1; return s.attackDelay(); });
+  assert.ok(normal.every((value, index) => value <= delays[index]), 'normal never waits longer than easy');
+  s.wave = WAVES.length;
+  assert.ok(normal.at(-1) <= 1.3, `normal must stay brisk at the end (${normal.at(-1)})`);
 });
