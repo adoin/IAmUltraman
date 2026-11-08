@@ -1,4 +1,4 @@
-import {chromium} from 'playwright';
+﻿import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 const out=process.env.BROWSER_ARTIFACT_DIR||'D:/tmp/ultraman-city-melee/range';await mkdir(out,{recursive:true});
@@ -18,9 +18,9 @@ const models=await act(`return ['redking','baltan','ganq'].map(name=>{const m=b.
  assert.equal(await act("return b.cast('beam')"),false);assert.equal(await act('return b.lastCast.beam'),-100);
  await page.keyboard.down('l');await frame(.35);assert.equal(await act('return b.guard'),true);await page.screenshot({path:out+'/x-shield.png'});await page.keyboard.up('l');
  await act('b.attack=null;b.nextAttack=100;');for(let i=0;i<3;i++){await page.keyboard.press('f');await frame(.4);}await frame(.8);assert.ok(await act('return b.enemyDistance>=35&&b.knockdowns===1'));await page.screenshot({path:out+'/retreat.png'});
- await page.keyboard.press('o');await frame(.35);assert.equal(await act('return b.monsterHealth'),54);await page.screenshot({path:out+'/palm.png'});await frame(.6);
+ await page.keyboard.press('o');await frame(.35);assert.equal(await act('return b.monsterHealth'),60);await page.screenshot({path:out+'/palm.png'});await frame(.6);
  await page.keyboard.press('j');await frame(.55);await act('b.visualEffects.forEach(e=>e.group.visible=false);b.renderer.render(b.renderScene,b.camera);');await page.screenshot({path:out+'/cross.png'});await act('b.enemyDistance=13;');await frame(.25);assert.equal(await act("return b.effects.some(e=>e.kind==='beam')||b.visualEffects.some(e=>e.kind==='beam')"),false);
- await act("b.start();b.wave=2;b.monsterHealth=145;b.monsterMax=145;b.selectMonster();b.nextAttack=100;");await frame(.5);await page.screenshot({path:out+'/baltan.png'});
+ await act("b.start();b.wave=2;b.monsterHealth=210;b.monsterMax=210;b.selectMonster();b.nextAttack=100;");await frame(.5);await page.screenshot({path:out+'/baltan.png'});
  await act('b.wave=4;b.selectMonster();b.nextAttack=100;');await frame(.5);await page.screenshot({path:out+'/ganq.png'});
  assert.equal((await page.locator('body').innerText()).trim(),(await page.locator('.battle-hud').innerText()).trim());assert.deepEqual(errors,[]);console.log('PASS real models, city textures, misses at range, charge, X shield, third-hit retreat, palm, remote cancellation and clean battle',JSON.stringify(models));
 }finally{await browser.close();}

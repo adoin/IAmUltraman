@@ -1,4 +1,4 @@
-# 模型制作与替换
+﻿# 模型制作与替换
 
 当前怪兽使用雷德王、巴尔坦星人、加恩Q 的第三方模型，来源见文末。旧版原创怪兽的 Blender 源文件作为归档保留；当前第一人称手臂基于 Extrazhang 的迪迦模型（CC BY-NC）适配。`.blend` 是可编辑源文件；浏览器加载导出的 `.glb`。Three.js 负责镜头、灯光、动画、技能、碰撞时机及画面渲染，不能直接打开 `.blend`。
 
@@ -105,7 +105,7 @@ $env:BLENDER_USER_SCRIPTS = 'PATH/mmd_scripts'
 & 'E:/Software/Blender/blender-5.4.0-alpha/blender.exe' --background --factory-startup --disable-autoexec --python-exit-code 1 --python art/import_mmd.py -- 'PATH/Basic Baltan.pmd' public/models/kaiju/baltan-new.glb
 ```
 
-当前使用（全部带骨骼）：`Baltan.pmd` → `baltan.glb`（替换旧巴尔坦，第 2 波，31 根骨）、`Basic Baltan.pmd` → `baltan-basic.glb`（第 3 波）、`Powered Baltan.pmd` → `baltan-powered.glb`（第 6 波）、`Mecha Baltan.pmd` → `baltan-mecha.glb`（第 7 波）、`Alien Mefilas.pmd` → `mefilas.glb`（第 5 波，54 根骨）、`Ultraseven.pmd` → `chaos-seven.glb`（第 8 波）、`Ultraman Taro.pmd` → `chaos-taro.glb`（第 9 波）、`Ultraman.pmd` → `chaos-ultraman.glb`（第 10 波）、`Zetton (50m).pmx` → `zetton.glb`（第 11 波，40 根骨）、`Mecha Gomora Kaiju Size 1.2.pmx` → `gomora-mecha.glb`（第 12 波，111 根骨）、`Galactron.pmx` → `galactron.glb`（第 13 波最终波，92 根骨）。骨骼命名两种都有：罗马字（`KOSHI` 髋、`MUNE` 胸、`KUBI` 颈、`L/R_ZYOUWAN` 上臂、`L/R_UDE` 前臂、`L/R_TE` 手、`L/R_MOMO` 大腿、`L/R_SUNE` 小腿、`L/R_ASHI` 脚）与日文（`下半身`/`上半身`/`首`/`腕.L`/`ひじ.L`/`手首.L`/`足.L`/`ひざ.L`/`足首.L`）；`src/monster-motion.js` 两套名字都能解析，攻击光弹从手骨位置发出。同包的 `Powered Baltan.pmd`、`Mecha Baltan.pmd`、`机械哥莫拉`、`铁三角（卡欧斯S/T/U）` 都可以用同一脚本转换。
+当前使用（全部带骨骼）：`Baltan.pmd` → `baltan.glb`（替换旧巴尔坦，第 2 波，31 根骨）、`Basic Baltan.pmd` → `baltan-basic.glb`（第 3 波）、`Powered Baltan.pmd` → `baltan-powered.glb`（第 6 波）、`Mecha Baltan.pmd` → `baltan-mecha.glb`（第 7 波）、`Alien Mefilas.pmd` → `mefilas.glb`（第 5 波，54 根骨）、`Ultraseven.pmd` → `chaos-seven.glb`（第 8 波）、`Ultraman Taro.pmd` → `chaos-taro.glb`（第 9 波）、`Ultraman.pmd` → `chaos-ultraman.glb`（第 10 波）、`Zetton (50m).pmx` → `zetton.glb`（第 11 波，40 根骨）、`Mecha Gomora Kaiju Size 1.2.pmx` → `gomora-mecha.glb`（第 12 波，111 根骨）、`Galactron.pmx` → `galactron.glb`（第 13 波，92 根骨）、`Gatanothor.pmx`（`Gatanothor (MMDCharizard)` 包，作者 十三月）→ `gatanothor.glb`（第 14 波最终 boss，155 根骨、6214 面；没有 `ひじ`/`UDE`，用 `腕3` 作前臂，脚下贴地、没有垂地尾巴）。骨骼命名两种都有：罗马字（`KOSHI` 髋、`MUNE` 胸、`KUBI` 颈、`L/R_ZYOUWAN` 上臂、`L/R_UDE` 前臂、`L/R_TE` 手、`L/R_MOMO` 大腿、`L/R_SUNE` 小腿、`L/R_ASHI` 脚）与日文（`下半身`/`上半身`/`首`/`腕.L`/`ひじ.L`/`手首.L`/`足.L`/`ひざ.L`/`足首.L`）；`src/monster-motion.js` 两套名字都能解析，攻击光弹从手骨位置发出。同包的 `Powered Baltan.pmd`、`Mecha Baltan.pmd`、`机械哥莫拉`、`铁三角（卡欧斯S/T/U）` 都可以用同一脚本转换。
 
 ### 尾巴：折到身后并做柔性弯曲
 

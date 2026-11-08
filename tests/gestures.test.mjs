@@ -65,3 +65,22 @@ test('releasing the forward palm re-arms the next arrow',()=>{
 });
 
 test('a punch spread over several camera frames retains its original retracted depth',()=>{const {bent,forward}=punchPoses(),r=new GestureRecognizer();r.update(bent,0);let seen=[];for(let n=1;n<=7;n++){const t=n/7,p=bent.map((a,i)=>({x:a.x+(forward[i].x-a.x)*t,y:a.y+(forward[i].y-a.y)*t,z:(a.z||0)+((forward[i].z||0)-(a.z||0))*t,visibility:1}));const out=r.update(p,n*65);if(out.punch)seen.push(out.punch);}assert.deepEqual(seen,['left']);});
+test('an L-shaped arm pose fires the Zepellion ray once and a crossed pose never does',()=>{
+  const pose=coords=>{const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;};
+  const L=pose({11:[250,180],12:[390,180],13:[255,300],15:[255,190],14:[400,300],16:[275,300]});
+  const r=new GestureRecognizer();let fired=0,guardSeen=false;
+  for(let t=0;t<=1400;t+=100){const out=r.update(L,t);if(out.skill==='zepellion')fired++;if(out.guard)guardSeen=true;}
+  assert.equal(fired,1);
+  assert.equal(guardSeen,false,'the L pose must not read as the X shield');
+  const cross=pose({11:[250,180],12:[390,180],13:[260,260],15:[395,260],14:[350,300],16:[350,185]});
+  const r2=new GestureRecognizer();
+  for(let t=0;t<=1400;t+=100)assert.notEqual(r2.update(cross,t).skill,'zepellion','a crossed "+" stays the Mebium ray');
+});
+test('a waist-high spare hand with a forward arm is enough for the palm sword',()=>{
+  const pose=coords=>{const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;};
+  const waist=pose({11:[250,180],12:[390,180],13:[228,196],15:[252,188],14:[400,300],16:[398,320]});
+  waist[13].z=-.1;waist[15].z=-.38;
+  const r=new GestureRecognizer();let fired=0;
+  for(let t=0;t<=1200;t+=80)if(r.update(waist,t).skill==='palm')fired++;
+  assert.equal(fired,1);
+});

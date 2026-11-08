@@ -1,20 +1,21 @@
-import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
+﻿import {BEAM_TIMING,DISC_TIMING,discTiming} from './action-timing.js';
 export const WAVES = [
   {name:'雷德王',model:'redking',title:'海湾入侵者',hp:110,color:0xffcb7a,attacks:['bolt','charge','slam']},
-  {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:140,color:0x68d9ff,attacks:['bolt','charge','sweep']},
-  {name:'巴尔坦星人 · 量产型',model:'baltan-basic',title:'分身战术',hp:160,color:0x5fd0ff,attacks:['bolt','sweep','charge']},
-  {name:'加恩Q',model:'ganq',title:'巨眼的凝视',hp:180,color:0xee596d,attacks:['bolt','sweep','charge']},
-  {name:'美菲拉斯星人',model:'mefilas',title:'幻影突袭',hp:195,color:0x62cfff,attacks:['sweep','bolt','charge']},
-  {name:'巴尔坦星人 · 强化体',model:'baltan-powered',title:'能量增幅',hp:215,color:0x7ee0ff,attacks:['bolt','charge','sweep']},
-  {name:'机械巴尔坦',model:'baltan-mecha',title:'改造追击者',hp:235,color:0x9ad7e8,attacks:['sweep','bolt','charge']},
-  {name:'卡欧斯 · 赛文',model:'chaos-seven',title:'暗影头镖',hp:255,color:0xdc7bff,attacks:['bolt','sweep','charge']},
-  {name:'卡欧斯 · 泰罗',model:'chaos-taro',title:'暗之王冠',hp:275,color:0xff9a7b,attacks:['sweep','bolt','charge']},
-  {name:'卡欧斯 · 奥特曼',model:'chaos-ultraman',title:'光之逆影',hp:295,color:0xc7a6ff,attacks:['bolt','charge','sweep']},
-  {name:'杰顿',model:'zetton',title:'宇宙恐龙',hp:320,color:0xff7a5c,attacks:['bolt','sweep','charge']},
+  {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:210,color:0x68d9ff,attacks:['bolt','charge','sweep']},
+  {name:'巴尔坦星人 · 量产型',model:'baltan-basic',title:'分身战术',hp:235,color:0x5fd0ff,attacks:['bolt','sweep','charge']},
+  {name:'加恩Q',model:'ganq',title:'巨眼的凝视',hp:185,color:0xee596d,attacks:['bolt','sweep','charge']},
+  {name:'美菲拉斯星人',model:'mefilas',title:'幻影突袭',hp:200,color:0x62cfff,attacks:['sweep','bolt','charge']},
+  {name:'巴尔坦星人 · 强化体',model:'baltan-powered',title:'能量增幅',hp:250,color:0x7ee0ff,attacks:['bolt','charge','sweep']},
+  {name:'机械巴尔坦',model:'baltan-mecha',title:'改造追击者',hp:270,color:0x9ad7e8,attacks:['sweep','bolt','charge']},
+  {name:'卡欧斯 · 赛文',model:'chaos-seven',title:'暗影头镖',hp:265,color:0xdc7bff,attacks:['bolt','sweep','charge']},
+  {name:'卡欧斯 · 泰罗',model:'chaos-taro',title:'暗之王冠',hp:285,color:0xff9a7b,attacks:['sweep','bolt','charge']},
+  {name:'卡欧斯 · 奥特曼',model:'chaos-ultraman',title:'光之逆影',hp:305,color:0xc7a6ff,attacks:['bolt','charge','sweep']},
+  {name:'杰顿',model:'zetton',title:'宇宙恐龙',hp:400,color:0xff7a5c,attacks:['bolt','sweep','charge']},
   {name:'机械哥莫拉',model:'gomora-mecha',title:'钢铁咆哮',hp:340,color:0xffb066,attacks:['slam','bolt','charge']},
-  {name:'迦拉克隆',model:'galactron',title:'最终守护战',hp:380,color:0x7fe7ff,attacks:['sweep','bolt','slam']},
+  {name:'迦拉克隆',model:'galactron',title:'光之要塞',hp:440,color:0x7fe7ff,attacks:['sweep','bolt','slam']},
+  {name:'加坦杰厄',model:'gatanothor',title:'暗黑支配者',hp:560,color:0x9a8cff,attacks:['slam','sweep','bolt','charge']},
 ];
-export const SKILLS={palm:{cooldown:2.2,damage:20,impact:.34,duration:.72},beam:{cooldown:3.2,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},disc:{cooldown:1.65,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
+export const SKILLS={palm:{cooldown:2.2,damage:14,impact:.34,duration:.72},beam:{cooldown:6.5,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},zepellion:{cooldown:9,damage:82,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},disc:{cooldown:2,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
 export const PUNCH={cooldown:.28,damage:12,impact:.18,duration:.36};
 export const SHIELD=Object.freeze({duration:2,cooldown:4,drain:10,recharge:14,blockCost:12});
 /** The final monster defeat hands the screen to the victory dance before results. */
@@ -33,6 +34,7 @@ export const MONSTER_ATTACK_NAMES={
   'gomora-mecha':{bolt:'机械光线',sweep:'超振动波',melee:'机械重拳',charge:'蛮力冲锋'},
   zetton:{bolt:'一兆度火球',sweep:'杰顿光线',melee:'能量拳',charge:'瞬移突进'},
   galactron:{bolt:'迦拉克隆光线',sweep:'重力冲击波',melee:'巨体重击',charge:'暴走冲锋'},
+  gatanothor:{bolt:'暗黑光弹',sweep:'触手横扫',melee:'巨钳重击',charge:'黑暗突进'},
 };
 export const ATTACKS={
   melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:1.0,flight:.3},
@@ -45,7 +47,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /** Deterministic combat simulation, independent of rendering and camera inference. */
 export class BattleEngine {
   constructor(onEvent=()=>{}){this.onEvent=onEvent;this.difficulty='easy';this.practice=false;this.reset();}
-  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
+  reset(){this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,zepellion:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=3.5;this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
   get waveInfo(){return WAVES[this.wave-1];}
   start(){this.reset();this.playing=true;this.onEvent({type:'wave',wave:1,info:this.waveInfo});}
   emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,monsterHP:this.monsterHealth,monsterMax:this.monsterMax,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {BattleEngine,ATTACKS,SHIELD,CELEBRATION,WAVES} from '../src/combat.js';
+import {BattleEngine,ATTACKS,SHIELD,CELEBRATION,WAVES,SKILLS} from '../src/combat.js';
 function battle(){const events=[];const scene=new BattleEngine(e=>events.push(e));scene.start();return{scene,events};}
 function advance(s,seconds){for(let t=0;t<seconds;t+=.05)s.update(.05);}
 function impact(s,kind){s.beginAttack(kind);advance(s,ATTACKS[kind].windup+ATTACKS[kind].flight+.1);}
@@ -27,7 +27,7 @@ test('sweep requires advertised safe side, while shockwave requires shield',()=>
 test('depleted shield cannot grant free invulnerability',()=>{const{scene:s}=battle();s.guardEnergy=1;s.setDefense(true);impact(s,'slam');assert.equal(s.heroHealth,80);assert.equal(s.stats.blocked,0);});
 test('powerful light beam interrupts windup and cancels incoming attack',()=>{const{scene:s,events}=battle();s.beginAttack('slam');s.cast('beam');advance(s,.7);assert.equal(s.attack,null);assert.ok(events.some(e=>e.type==='interrupt'));assert.equal(s.monsterHealth,64);assert.equal(s.heroHealth,100);});
 test('practice preserves health; projectiles do not hurt their owner',()=>{const{scene:s}=battle();s.practice=true;for(const kind of Object.keys(ATTACKS))impact(s,kind);assert.equal(s.heroHealth,100);assert.equal(s.monsterHealth,110);});
-test('cooldown, pause and defeated enemy prevent repeated casts',()=>{const{scene:s}=battle();assert.equal(s.cast('beam'),true);assert.equal(s.cast('beam'),false);advance(s,3.3);assert.equal(s.cast('beam'),true);s.paused=true;assert.equal(s.cast('disc'),false);s.paused=false;s.damage(1000);assert.equal(s.cast('disc'),false);});
+test('cooldown, pause and defeated enemy prevent repeated casts',()=>{const{scene:s}=battle();assert.equal(s.cast('beam'),true);assert.equal(s.cast('beam'),false);advance(s,SKILLS.beam.cooldown+.1);assert.equal(s.cast('beam'),true);s.paused=true;assert.equal(s.cast('disc'),false);s.paused=false;s.damage(1000);assert.equal(s.cast('disc'),false);});
 test('pause freezes incoming attacks and restarting clears transient state',()=>{const{scene:s}=battle();s.beginAttack('bolt');s.paused=true;advance(s,20);assert.equal(s.attack.age,0);assert.equal(s.heroHealth,100);s.start();assert.equal(s.attack,null);assert.equal(s.effects.length,0);assert.equal(s.guard,false);assert.equal(s.lean,0);});
 test('energy depletion ends combat and restart restores energy',()=>{const{scene:s,events}=battle();for(let i=0;i<6;i++)impact(s,'slam');assert.equal(s.heroHealth,0);assert.equal(s.finished,true);assert.ok(events.some(e=>e.type==='over'));s.start();assert.equal(s.heroHealth,100);assert.equal(s.finished,false);});
 test('ordinary punches cause real impact damage independently of skill cooldowns',()=>{const{scene:s}=battle();s.enemyDistance=13;s.lastCast.beam=s.time;s.lastCast.disc=s.time;assert.equal(s.punch('left'),true);assert.equal(s.punch('right'),false);s.update(.1);assert.equal(s.monsterHealth,110);s.update(.1);assert.equal(s.monsterHealth,98);s.update(.2);assert.equal(s.punch('right'),true);s.update(.2);assert.equal(s.monsterHealth,86);assert.equal(s.lastCast.beam,0);assert.equal(s.lastCast.disc,0);assert.equal(s.guardEnergy,100);});
@@ -63,3 +63,37 @@ test('the first wave opens with a visible ranged attack before charging',()=>{co
 test('a prepared left disc uses the short throw timeline, stores hand and cancels preview',()=>{const b=new BattleEngine();b.start();b.setDiscPreparation({side:'left',progress:1,armed:true});assert.equal(b.cast('disc','left'),true);const e=b.effects[0];assert.equal(e.prepared,true);assert.equal(e.side,'left');assert.equal(b.discGesture,null);b.update(.57);assert.equal(b.monsterHealth,110);b.update(.02);assert.equal(b.monsterHealth,79);});
 
 test('disc preparation is cleared by punching, pause input and melee entry',()=>{const b=new BattleEngine();b.start();const prep={side:'right',progress:1,armed:true};b.setDiscPreparation(prep);b.punch('left');assert.equal(b.discGesture,null);b.setDiscPreparation(prep);b.enemyDistance=16;b.update(.01);assert.equal(b.discGesture,null);b.enemyDistance=35;b.paused=true;b.setDiscPreparation(prep);assert.equal(b.discGesture,null);});
+test('zepellion is the strongest ray, with the longest cooldown beside the rebalanced disc',()=>{
+  const{scene:s}=battle();
+  assert.ok(SKILLS.zepellion.damage>SKILLS.beam.damage,'zepellion must out-damage the Mebium ray');
+  assert.ok(SKILLS.zepellion.cooldown>SKILLS.beam.cooldown);
+  assert.equal(SKILLS.beam.cooldown,6.5);assert.equal(SKILLS.zepellion.cooldown,9);assert.equal(SKILLS.disc.cooldown,2);
+  assert.equal(SKILLS.palm.damage,14);
+  const before=s.monsterHealth;
+  assert.equal(s.cast('zepellion'),true);
+  advance(s,SKILLS.zepellion.impact+.05);
+  assert.equal(s.monsterHealth,before-SKILLS.zepellion.damage);
+  assert.equal(s.cast('zepellion'),false,'cooldown must reject an immediate recast');
+});
+test('the final wave is Gatanothor, then Galactron and Zetton, then the Baltan family',()=>{
+  const last=WAVES[WAVES.length-1];
+  assert.equal(last.model,'gatanothor','the new boss must close the adventure');
+  const runnerUp=Math.max(...WAVES.slice(0,-1).map(w=>w.hp));
+  assert.ok(last.hp>=runnerUp*1.15,`Gatanothor ${last.hp} must clearly lead ${runnerUp}`);
+  for(const model of ['zetton','galactron']) {
+    const wave=WAVES.find(w=>w.model===model);
+    assert.ok(wave,'missing '+model);
+    for(const other of WAVES) {
+      if(other===wave||other.model==='gatanothor') continue;
+      if(model==='zetton'&&other.model==='galactron') continue;
+      assert.ok(wave.hp>other.hp,`${model} ${wave.hp} must out-scale ${other.model} ${other.hp}`);
+    }
+  }
+  const baltans=['baltan','baltan-basic','baltan-powered','baltan-mecha'];
+  for(const model of baltans) {
+    const index=WAVES.findIndex(w=>w.model===model);
+    assert.ok(index>=0,'missing '+model);
+    if(index===0) continue;
+    assert.ok(WAVES[index].hp>WAVES[index-1].hp,`${model} must lift its wave above the previous one`);
+  }
+});

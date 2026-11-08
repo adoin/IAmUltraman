@@ -14,29 +14,29 @@ function segmentsCross(a,b,c,d){
 /** Geometry uses image pixels (not normalized x/y) to preserve angles at any aspect ratio. */
 export class GestureRecognizer {
   constructor(){this.mode='easy';this.reset();}
-  reset(){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
+  reset(){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.lSince=null;this.lFired=false;this.raise=[null,null];this.armed=[null,null];this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
   /**
-   * One palm pushed toward the camera, the other hand kept out of the way.
-   * Depth alone is noisy on cheap webcams, so a foreshortened straight arm
-   * (short 2D reach with forward depth) and the illustrated side reach both
-   * count. The spare hand only has to be bent, lowered or tucked in.
+   * One arm pushed forward, the other resting at the waist. Depth alone is
+   * noisy on cheap webcams, so a foreshortened straight arm (short 2D reach with
+   * forward depth) and an illustrated side reach both count, and the spare hand
+   * only has to hang low beside the body or stay bent.
    */
   palmThrust(arm,scale,easy){
-    const straight=arm.angle>(easy?126:140);
+    const straight=arm.angle>(easy?118:132);
     const forward=(arm.s.z-arm.w.z)/scale;
     const reach=length(arm.s,arm.w)/scale;
     const lateral=Math.abs(arm.w.x-arm.s.x)/scale;
     const height=(arm.w.y-arm.s.y)/scale;
-    const aimed=lateral<(easy?1.25:1.05)&&height<(easy?.55:.4)&&height>-(easy?.65:.45);
-    const pushed=forward>(easy?.09:.14)||(reach>(easy?1:1.15)&&forward>-(easy?.12:.06));
-    const otherBent=arm.otherAngle<(easy?158:150);
-    const otherLow=(arm.otherW.y-arm.otherS.y)/scale>(easy?.14:.28);
-    const otherTucked=Math.abs(arm.otherW.x-arm.otherS.x)/scale<(easy?.9:.65);
-    const spare=otherBent||otherLow||otherTucked;
+    const aimed=lateral<(easy?1.2:1.02)&&height<(easy?.6:.45)&&height>-(easy?.7:.5);
+    const pushed=forward>(easy?.07:.11)||(reach>(easy?.95:1.1)&&forward>-(easy?.12:.06));
+    const waistLow=(arm.otherW.y-arm.otherS.y)/scale>(easy?.26:.38);
+    const waistClose=Math.abs(arm.otherW.x-arm.otherS.x)/scale<(easy?.85:.66);
+    const otherBent=arm.otherAngle<(easy?156:148);
+    const spare=(waistLow&&waistClose)||otherBent;
     return straight&&aimed&&pushed&&spare;
   }
   update(points,time,width=640,height=480){
-    const out={skill:null,skillSide:null,discPreparation:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；十字发光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,debug:{}};
+    const out={skill:null,skillSide:null,discPreparation:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；胸前十字＝梅特里姆光线，手臂摆成 L＝哉佩利敖光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,debug:{}};
     if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>900)) this.reset();
     this.lastTime=time;
     if(!points) return this.lost(out);
@@ -60,9 +60,15 @@ export class GestureRecognizer {
     const gap=Math.min(segmentDistance(lw,re,rw),segmentDistance(rw,le,lw),segmentDistance(le,re,rw),segmentDistance(re,le,lw))/scale;
     const centerY=(ls.y+rs.y)/2;
     const chest=(lw.y+rw.y)/2 > centerY-scale*.75 && (lw.y+rw.y)/2 < centerY+scale*1.65;
-    const cross=!this.armed.some(Boolean)&&horizontal<(easy?43:30) && vertical>(easy?47:60) && gap<(easy?.65:.4) && chest;
+    const forearmsCross=segmentsCross(le,lw,re,rw);
+    const oneEach=!this.armed.some(Boolean)&&horizontal<(easy?43:30)&&vertical>(easy?47:60)&&gap<(easy?.65:.4)&&chest;
+    // "+" (forearms crossing) is the Mebium ray. An "L" corner - one forearm
+    // vertical, the other horizontal, wrists meeting but never crossing - is
+    // Tiga's Zepellion pose.
+    const cross=oneEach&&forearmsCross;
+    const zepellionPose=oneEach&&!forearmsCross;
     const crossedWrists=(lw.x-rw.x)*(ls.x-rs.x)<0;
-    const guardPose=crossedWrists&&chest&&angles.every(a=>a>25&&a<78)&&segmentsCross(le,lw,re,rw);
+    const guardPose=crossedWrists&&chest&&angles.every(a=>a>25&&a<78)&&forearmsCross;
     if(guardPose){this.palmSince=null;this.palmFired=false;this.punchReady=[null,null];this.guardSince??=time;out.guard=time-this.guardSince>=120;out.status=out.guard?'已识别举臂防御':'胸前交叉双臂，准备防御';out.charge=out.guard?1:.4;this.raise=[null,null];this.armed=[null,null];return out;}
     this.guardSince=null;
     const extended=[elbowAngle(ls,le,lw),elbowAngle(rs,re,rw)];
@@ -86,8 +92,18 @@ export class GestureRecognizer {
       out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='保持前推，别松手…';
     }else{this.palmSince=null;this.palmFired=false;}
     const hold=easy?420:600;
-    out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,armed:this.armed.some(Boolean)};
+    out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,l:zepellionPose,armed:this.armed.some(Boolean)};
     if(palmInfo)out.debug.palm=palmInfo;
+    if(zepellionPose&&!guardPose){
+      // Tiga's finish: both forearms meet in an L, the vertical one outside the
+      // horizontal one, so the arms never cross like the Mebium "+" pose.
+      this.lSince??=time;
+      const lHold=easy?700:850;
+      out.charge=clamp((time-this.lSince)/lHold,0,1);
+      out.status='手臂摆成 L 形，凝聚哉佩利敖光线…';
+      if(out.charge>=1&&!this.lFired){out.skill='zepellion';out.skillSide='right';this.lFired=true;this.raise=[null,null];this.armed=[null,null];}
+      if(this.lFired)out.status='哉佩利敖光线！放下双手，再来一次';
+    }else{this.lSince=null;this.lFired=false;}
     if(cross&&!guardPose){
       this.crossSince??=time;
       out.charge=clamp((time-this.crossSince)/hold,0,1);out.status='保持十字姿势，凝聚光线…';
@@ -96,7 +112,7 @@ export class GestureRecognizer {
     }else{this.crossSince=null;this.crossFired=false;}
     const nose=p[0],headTop=visible(nose)&&nose.y<centerY-scale*.2?nose.y-scale*.4:centerY-scale*.65;
     for(let side=0;side<2;side++){
-      if(cross||guardPose||palmArm)continue;
+      if(cross||zepellionPose||guardPose||palmArm)continue;
       const wrist=side===0?lw:rw,shoulder=side===0?ls:rs;
       const high=wrist.y<headTop-scale*.05&&angles[side]>50;
       const relative={x:(wrist.x-shoulder.x)/scale,y:(wrist.y-shoulder.y)/scale,z:(wrist.z-shoulder.z)/scale};
@@ -141,5 +157,5 @@ export class GestureRecognizer {
     candidates.sort((a,b)=>b.score-a.score);const side=candidates[0].side;
     out.punch=side===0?'left':'right';out.status=side===0?'左直拳！收拳后继续':'右直拳！收拳后继续';this.punchLast[side]=time;this.punchReady[side]=null;
   }
-  lost(out){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.punchReady=[null,null];this.crossSince=null;this.crossFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
+  lost(out){this.palmSince=null;this.palmLast=null;this.palmFired=false;this.punchReady=[null,null];this.crossSince=null;this.crossFired=false;this.lSince=null;this.lFired=false;this.guardSince=null;this.raise=[null,null];this.armed=[null,null];out.status='让肩膀、手肘和双手完整入镜';return out;}
 }

@@ -45,6 +45,10 @@ export class MonsterMotion {
       foot: pair('ASHI', '足首'),
     };
     this.mmd = !!(this.rig.arm.L && this.rig.arm.R && this.rig.hand.L && this.rig.hand.R && this.rig.chest);
+    // Rigs without a ひじ/UDE bone still split the arm: 腕2.L is the next joint
+    // down, which is enough for the aim() reach.
+    if (!this.rig.fore.L) this.rig.fore.L = pick('L_WAN2', '腕3.L', '腕2.L');
+    if (!this.rig.fore.R) this.rig.fore.R = pick('R_WAN2', '腕3.R', '腕2.R');
     // A tail baked behind the feet (art/mmd_tail.py) still needs life: sway the
     // chain in world space so the appendage flexes instead of swinging rigidly.
     const tail = [];

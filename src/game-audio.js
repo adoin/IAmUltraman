@@ -1,4 +1,6 @@
-/** Original synthesized score and effects; all voices are bundled, never inferred in battle. */
+﻿/** Original synthesized score and effects; all voices are bundled, never inferred in battle. */
+import {SKILLS} from './combat.js';
+
 export class GameAudio {
   constructor(){this.enabled=true;this.musicEnabled=true;this.voiceEnabled=true;this.active=false;this.voices=new Map();this.voiceHistory=new Map();this.finisherWave=0;this.hurtIndex=0;this.musicStep=0;this.musicURL=null;this.generation=0;}
   async unlock(){
@@ -25,6 +27,7 @@ export class GameAudio {
     if(kind==='punch'){this.noise(.16,.17,3500,now,pan);return;}
     if(kind==='hit'||kind==='hurt'){this.noise(.18,.5,kind==='hurt'?1200:2200,now,pan);this.note(kind==='hurt'?95:155,.23,.45,'sine',now,this.fxGain,36,pan);return;}
     if(kind==='beam'){this.note(150,.55,.12,'sawtooth',now,this.fxGain,750);this.noise(1.1,.25,6000,now+.48);this.note(180,.9,.13,'triangle',now+.48,this.fxGain,65);return;}
+ if(kind==='zepellion'){this.note(90,.8,.14,'sawtooth',now,this.fxGain,900);this.noise(1.6,.3,7000,now+.6);this.note(140,1.2,.15,'triangle',now+.6,this.fxGain,55);this.note(420,1.0,.08,'sine',now+.6,this.fxGain,40);return;}
     if(kind==='disc'){this.note(430,.45,.16,'triangle',now,this.fxGain,1500);this.noise(.35,.18,5500,now+.22,pan);return;}
     if(kind==='palm'){this.note(1050,.3,.2,'triangle',now,this.fxGain,180);return;}
     if(kind==='guard'){this.noise(.13,.26,7000,now);[720,1080,1440].forEach(f=>this.note(f,.4,.08,'sine',now));return;}
@@ -68,7 +71,7 @@ export class GameAudio {
     if(event.type==='over'){this.ended=true;this.syncMusic();this.speak('hurt1',4,0);}
   }
   update(b){if(!this.active||b.paused||!b.playing||b.finished||b.defeated)return;
-    if(b.enemyDistance>=26&&b.monsterHealth<=46&&b.monsterHealth>0&&b.time-b.lastCast.beam>=3.2&&!b.effects.some(e=>e.kind!=='punch')&&this.finisherWave!==b.wave){if(this.speak('finish',3,0))this.finisherWave=b.wave;}
+    if(b.enemyDistance>=26&&b.monsterHealth<=46&&b.monsterHealth>0&&b.time-b.lastCast.beam>=SKILLS.beam.cooldown&&!b.effects.some(e=>e.kind!=='punch')&&this.finisherWave!==b.wave){if(this.speak('finish',3,0))this.finisherWave=b.wave;}
   }
   dispose(){this.generation++;clearInterval(this.timer);this.stopVoice();this.musicElement?.pause();if(this.musicURL)URL.revokeObjectURL(this.musicURL);this.context?.close();}
 }

@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BattleEngine, SKILLS, CELEBRATION, WAVES} from './combat.js';
 import {MonsterMotion} from './monster-motion.js';
@@ -281,14 +281,15 @@ export class BattleScene extends BattleEngine {
     const group=new THREE.Group();this.renderScene.add(group);this.camera.updateMatrixWorld(true);
     const start=this.hero.socketWorld(kind),end=this.getHitPoint();
     const timing=kind==='disc'?discTiming(data):null;
-    const entry={kind,group,side:data.side,prepared:data.prepared,timing,age:0,duration:kind==='beam'?BEAM_TIMING.lightEnd:timing?.end??SKILLS[kind].duration,start,end};
+    const beamFamily=kind==='beam'||kind==='zepellion',ultra=kind==='zepellion';
+    const entry={kind,group,side:data.side,prepared:data.prepared,timing,age:0,duration:beamFamily?BEAM_TIMING.lightEnd:timing?.end??SKILLS[kind].duration,start,end};
     if(kind==='palm'){
       entry.orb=this.flare(start,0x89eaff,1.8,group,1);entry.core=this.flare(start,0xffffff,.55,group,1);
-    }else if(kind==='beam'){
-      entry.volume=new BeamVolume();entry.volume.visible=false;group.add(entry.volume);
-      entry.launch=this.flare(start,0x60e8ff,1.7,group,.6);entry.sourceCore=this.flare(start,0xffffff,.36,group,0);entry.launch.material.opacity=0;
-      entry.contact=this.flare(end,0x55d5ff,3.5,group,0);
-      const light=new THREE.PointLight(0x6aeaff,90,18,1.5);light.position.copy(start);group.add(light);entry.light=light;
+    }else if(beamFamily){
+      entry.volume=new BeamVolume(ultra?{core:[.42,.3,1],edge:[.86,.74,1],filaments:[0xc6b2ff,0xf4efff],gain:1.4,radius:1.3}:undefined);entry.volume.visible=false;group.add(entry.volume);
+      entry.launch=this.flare(start,ultra?0xa98dff:0x60e8ff,ultra?2.2:1.7,group,.6);entry.sourceCore=this.flare(start,0xffffff,.36,group,0);entry.launch.material.opacity=0;
+      entry.contact=this.flare(end,ultra?0xb49dff:0x55d5ff,ultra?4.6:3.5,group,0);
+      const light=new THREE.PointLight(ultra?0xa78fff:0x6aeaff,ultra?105:90,ultra?20:18,1.5);light.position.copy(start);group.add(light);entry.light=light;
     }else{
       const disc=new THREE.Group();group.add(disc);entry.disc=disc;
       const gold=glow(0xffbf45);gold.blending=THREE.NormalBlending;gold.opacity=.96;this.mesh(new THREE.TorusGeometry(.38,.026,10,64),gold,null,disc);
@@ -302,9 +303,10 @@ export class BattleScene extends BattleEngine {
     this.visualEffects.push(entry);
   }
   impactEffect(source,side,point=this.getHitPoint()){
-    const special=source==='beam'||source==='disc',color=source==='disc'?0xffcb6a:source==='beam'?0x75eaff:0xffe8b1;
+    const special=source==='beam'||source==='zepellion'||source==='disc',color=source==='disc'?0xffcb6a:source==='zepellion'?0xc3aaff:source==='beam'?0x75eaff:0xffe8b1;
+    const size=special?(source==='zepellion'?9:7):1.5;
     const group=new THREE.Group();group.position.copy(point).add(V(0,0,.2));this.renderScene.add(group);
-    const size=special?7:1.5;this.flare(V(),color,size,group,special?.9:.55);this.flare(V(),0xffffff,size*.36,group,special?1:.65);
+    this.flare(V(),color,size,group,special?.9:.55);this.flare(V(),0xffffff,size*.36,group,special?1:.65);
     const rings=[];for(let i=0;i<(special?3:1);i++)rings.push(this.mesh(new THREE.TorusGeometry(1+i*.3,.06,6,64),glow(color,.9-i*.15),V(),group));
     const light=new THREE.PointLight(color,special?170:14,25,1.4);group.add(light);
     this.visualEffects.push({kind:'impact',group,rings,light,age:0,duration:special?.75:.32});
@@ -388,7 +390,7 @@ export class BattleScene extends BattleEngine {
       return;
     }
     const factor=1-Math.exp(-dt*10);this.renderLean=mix(this.renderLean,this.lean,factor);
-    const beam=this.effects.find(e=>e.kind==='beam'),disc=this.effects.find(e=>e.kind==='disc'),punch=this.effects.filter(e=>e.kind==='punch').at(-1);
+    const beam=this.effects.find(e=>e.kind==='beam'||e.kind==='zepellion'),disc=this.effects.find(e=>e.kind==='disc'),punch=this.effects.filter(e=>e.kind==='punch').at(-1);
     const palm=this.effects.find(e=>e.kind==='palm');
     const guard=!beam&&!disc&&!palm&&!punch&&this.guard&&this.guardEnergy>0?1:0;
     if(guard&&!this.guardWasActive)this.shieldIgnition=.55;this.guardWasActive=guard;this.shieldIgnition=Math.max(0,(this.shieldIgnition||0)-dt);this.guardAmount=mix(this.guardAmount,guard,factor);
@@ -411,7 +413,7 @@ export class BattleScene extends BattleEngine {
         e.end.copy(this.getHitPoint());const flight=clamp((e.age-.18)/.16,0,1),point=e.start.clone().lerp(e.end,flight);
         e.orb.position.copy(point);e.core.position.copy(point);e.orb.material.opacity=e.age>.34?Math.max(0,1-(e.age-.34)/.2):1;e.core.material.opacity=e.orb.material.opacity;
       }
-      if(e.kind==='beam'){
+    if(e.kind==='beam'||e.kind==='zepellion'){
         e.start.copy(this.hero.socketWorld('beam'));e.end.copy(this.getHitPoint());
         const firing=e.age>=BEAM_TIMING.fire,reveal=clamp((e.age-BEAM_TIMING.fire)/(BEAM_TIMING.impact-BEAM_TIMING.fire),0,1),fade=clamp((e.duration-e.age)/(e.duration-BEAM_TIMING.fade),0,1);
         const [bottom,top]=this.hero.beamRail();e.volume.update(bottom,top,e.end,reveal,e.age,fade,this.reduced);

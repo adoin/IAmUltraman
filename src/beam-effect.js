@@ -5,29 +5,32 @@ import * as THREE from 'three';
  * The translucent sheet supplies bloom-like falloff without a full-screen post pass.
  */
 export class BeamVolume extends THREE.Group {
-  constructor(){
+  /** `tint` recolours the rays; the default is the blue Mebium beam. */
+  constructor(tint={}){
     super();
+    const core=tint.core||[.20,.36,1.0],edge=tint.edge||[.40,.95,1.0],gain=tint.gain||1,radius=tint.radius||1;
+    const filaments=tint.filaments||[0x90eeff,0xe4e5ff];
     const geometry=new THREE.BufferGeometry();
     geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(12),3));
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,0,1,1,1],2));
     geometry.setIndex([0,1,2,2,1,3]);
     this.sheet=new THREE.Mesh(geometry,new THREE.ShaderMaterial({
-      uniforms:{age:{value:0},strength:{value:0},motion:{value:1}},
+      uniforms:{age:{value:0},strength:{value:0},motion:{value:1},gain:{value:gain}},
       transparent:true,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,toneMapped:false,
       vertexShader:'varying vec2 coord;void main(){coord=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader:`varying vec2 coord;uniform float age;uniform float strength;uniform float motion;
+      fragmentShader:`varying vec2 coord;uniform float age;uniform float strength;uniform float motion;uniform float gain;
         void main(){
           float edge=pow(max(0.0,sin(coord.y*3.14159265)),.7);
           float streams=.6+.4*pow(.5+.5*sin(coord.y*110.0+sin(coord.x*25.0-age*20.0*motion)),4.0);
           float pulse=.75+.25*sin(coord.x*65.0-age*45.0*motion);
-          vec3 color=mix(vec3(.20,.36,1.0),vec3(.40,.95,1.0),streams);
-          gl_FragColor=vec4(color,edge*streams*pulse*strength*.28);
+          vec3 color=mix(vec3(${core.join(',')}),vec3(${edge.join(',')}),streams);
+          gl_FragColor=vec4(color,min(1.0,edge*streams*pulse*strength*.28*gain));
           #include <colorspace_fragment>
         }`,
     }));
     this.sheet.frustumCulled=false;this.add(this.sheet);
     this.filaments=Array.from({length:9},(_,i)=>{
-      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(i%2?.012:.019,i%2?.012:.019,1,8,1,true),new THREE.MeshBasicMaterial({color:i%3?0x90eeff:0xe4e5ff,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false,fog:false}));
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry((i%2?.012:.019)*radius,(i%2?.012:.019)*radius,1,8,1,true),new THREE.MeshBasicMaterial({color:i%3?filaments[0]:filaments[1],transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false,fog:false}));
       mesh.frustumCulled=false;this.add(mesh);return mesh;
     });
     this.up=new THREE.Vector3(0,1,0);this.sourceBottom=new THREE.Vector3();this.sourceTop=new THREE.Vector3();
