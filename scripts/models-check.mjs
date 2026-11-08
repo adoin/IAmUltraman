@@ -21,6 +21,6 @@ const models=await act(`return ['redking','baltan','ganq'].map(name=>{const m=b.
  await page.keyboard.press('o');await frame(.35);assert.equal(await act('return b.monsterHealth'),60);await page.screenshot({path:out+'/palm.png'});await frame(.6);
  await page.keyboard.press('j');await frame(.55);await act('b.visualEffects.forEach(e=>e.group.visible=false);b.renderer.render(b.renderScene,b.camera);');await page.screenshot({path:out+'/cross.png'});await act('b.enemyDistance=13;');await frame(.25);assert.equal(await act("return b.effects.some(e=>e.kind==='beam')||b.visualEffects.some(e=>e.kind==='beam')"),false);
  await act("b.start();b.wave=2;b.monsterHealth=210;b.monsterMax=210;b.selectMonster();b.nextAttack=100;");await frame(.5);await page.screenshot({path:out+'/baltan.png'});
- await act('b.wave=4;b.selectMonster();b.nextAttack=100;');await frame(.5);await page.screenshot({path:out+'/ganq.png'});
+ await act('b.wave=3;b.selectMonster();b.nextAttack=100;');await frame(.5);await page.screenshot({path:out+'/ganq.png'});
  assert.equal((await page.locator('body').innerText()).trim(),(await page.locator('.battle-hud').innerText()).trim());assert.deepEqual(errors,[]);console.log('PASS real models, city textures, misses at range, charge, X shield, third-hit retreat, palm, remote cancellation and clean battle',JSON.stringify(models));
 }finally{await browser.close();}

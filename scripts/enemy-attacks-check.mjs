@@ -1,4 +1,4 @@
-import {chromium} from 'playwright';
+﻿import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir, writeFile} from 'node:fs/promises';
 const folder = process.env.BROWSER_ARTIFACT_DIR || 'D:/tmp/ultraman-enemy-attacks/verified';
@@ -33,7 +33,7 @@ try {
   for (const [wave, name, kinds] of [
     [1, 'redking', ['melee', 'bolt', 'slam', 'charge']],
     [2, 'baltan', ['melee', 'bolt', 'sweep', 'charge']],
-    [4, 'ganq', ['bolt', 'sweep', 'melee', 'charge']],
+    [3, 'ganq', ['bolt', 'sweep', 'melee', 'charge']],
   ])
     for (const kind of kinds) {
       const base = await act(

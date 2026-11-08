@@ -49,6 +49,7 @@ export class MonsterMotion {
     // down, which is enough for the aim() reach.
     if (!this.rig.fore.L) this.rig.fore.L = pick('L_WAN2', '腕3.L', '腕2.L');
     if (!this.rig.fore.R) this.rig.fore.R = pick('R_WAN2', '腕3.R', '腕2.R');
+    this.limbs = {L: this.limbChain('L'), R: this.limbChain('R')};
     // A tail baked behind the feet (art/mmd_tail.py) still needs life: sway the
     // chain in world space so the appendage flexes instead of swinging rigidly.
     const tail = [];
@@ -208,6 +209,39 @@ export class MonsterMotion {
     bone.quaternion.copy(bone.parent.getWorldQuaternion(Q()).invert().multiply(world));
     bone.updateWorldMatrix(false, true);
   }
+
+  /** Bone path from a shoulder down to that side's hand, e.g. 腕 / 腕2…腕7 / 手首. */
+  limbChain(side) {
+    const start = this.rig?.arm?.[side],
+      end = this.rig?.hand?.[side];
+    if (!start || !end) return [];
+    const walk = (bone, trail) => {
+      const next = trail.concat(bone);
+      if (bone === end) return next;
+      for (const child of bone.children) {
+        if (!child.isBone) continue;
+        const found = walk(child, next);
+        if (found) return found;
+      }
+      return null;
+    };
+    return walk(start, []) || [];
+  }
+
+  /**
+   * Aim a whole limb, not just the first joint. Long MMD arms (機械哥莫拉 has
+   * 腕…腕7 before 手首) leave the claws in front of the chest when only the
+   * shoulder is turned; every segment follows the direction instead. Three-bone
+   * rigs (shoulder / elbow / hand) behave exactly as before.
+   */
+  aimLimb(side, first, second = first, split = 0.5) {
+    const chain = this.limbs?.[side] || [];
+    if (chain.length < 2) return;
+    const cut = Math.max(1, Math.round((chain.length - 1) * split));
+    for (let i = 0; i < chain.length - 1; i++)
+      this.aim(chain[i].name, chain[i + 1].name, i < cut ? first : second);
+  }
+
   turn(name, axis, angle) {
     const bone = this.node(name);
     if (!bone) return;
@@ -252,8 +286,7 @@ export class MonsterMotion {
       const sign = castSide === 'L' ? 1 : -1;
       for (const limb of ['L', 'R']) {
         const out = limb === 'L' ? 1 : -1;
-        aim(rig.arm[limb], rig.fore[limb], V(out * 0.3, -1, 0.06));
-        aim(rig.fore[limb], rig.hand[limb], V(out * 0.14, -1, 0.12));
+        this.aimLimb(limb, V(out * 0.3, -1, 0.06), V(out * 0.14, -1, 0.12), 0.45);
       }
       if (rig.neck)
         this.turn(rig.neck.name, V(1, 0, 0), active?.kind === 'charge' ? 0.12 * gather : 0.05 * Math.sin(time * 1.7));
@@ -262,19 +295,16 @@ export class MonsterMotion {
         this.turn(rig.chest.name, V(0, 1, 0), 0.03 * Math.sin(time * 0.9));
       }
       if (active) {
-        const arm = rig.arm[castSide];
-        const fore = rig.fore[castSide];
-        const hand = rig.hand[castSide];
         if (active.kind === 'bolt' || active.kind === 'sweep') {
-          const raise = V(sign * 0.35, 0.55, -0.45).lerp(V(sign * 0.14, 0.12, 1), strike);
-          aim(arm, fore, raise.clone().lerp(V(sign * 0.3, -1, 0.06), Math.max(0, 1 - gather * 2)));
-          aim(fore, hand, raise);
+          // Y is up and +Z is toward the player, so a wind-up has to lift the arm
+          // forward-up; pointing it at -Z raised it behind the shoulder instead.
+          const raise = V(sign * 0.25, 0.38, 0.55).lerp(V(sign * 0.1, 0.08, 1), strike);
+          this.aimLimb(castSide, raise.clone().lerp(V(sign * 0.3, -1, 0.06), Math.max(0, 1 - gather * 2)), raise, 0.4);
           if (rig.chest) this.turn(rig.chest.name, V(0, 1, 0), -sign * 0.25 * gather);
         }
         if (active.kind === 'melee') {
           const punch = strike > 0 ? V(sign * 0.16, 0.12, 1) : V(sign * 0.4, 0.2, -0.7);
-          aim(arm, fore, punch);
-          aim(fore, hand, punch);
+          this.aimLimb(castSide, punch);
           if (rig.chest) this.turn(rig.chest.name, V(0, 1, 0), -sign * 0.3 * strike * fade);
         }
         if (active.kind === 'charge') {
@@ -299,8 +329,8 @@ export class MonsterMotion {
         this.tail.forEach((bone, index) => {
           const ramp = (index + 1) / this.tail.length;
           const phase = time * 1.6 - index * 0.7;
-          this.turn(bone.name, V(0, 1, 0), 0.03 * ramp * life * Math.sin(phase));
-          this.turn(bone.name, V(1, 0, 0), 0.018 * ramp * life * Math.cos(phase * 0.8));
+          this.turn(bone.name, V(0, 1, 0), 0.017 * ramp * life * Math.sin(phase));
+          this.turn(bone.name, V(1, 0, 0), 0.01 * ramp * life * Math.cos(phase * 0.8));
         });
       }
       if (hurt && rig.chest) this.turn(rig.chest.name, V(1, 0, 0), -0.16);

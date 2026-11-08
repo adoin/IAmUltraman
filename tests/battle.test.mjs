@@ -1,4 +1,4 @@
-import {test} from 'node:test';
+﻿import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {BattleEngine,ATTACKS,SHIELD,CELEBRATION,WAVES,SKILLS} from '../src/combat.js';
 function battle(){const events=[];const scene=new BattleEngine(e=>events.push(e));scene.start();return{scene,events};}
@@ -89,7 +89,7 @@ test('the final wave is Gatanothor, then Galactron and Zetton, then the Baltan f
       assert.ok(wave.hp>other.hp,`${model} ${wave.hp} must out-scale ${other.model} ${other.hp}`);
     }
   }
-  const baltans=['baltan','baltan-basic','baltan-powered','baltan-mecha'];
+  const baltans=['baltan'];
   for(const model of baltans) {
     const index=WAVES.findIndex(w=>w.model===model);
     assert.ok(index>=0,'missing '+model);

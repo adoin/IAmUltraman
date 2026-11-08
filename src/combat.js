@@ -2,11 +2,8 @@
 export const WAVES = [
   {name:'雷德王',model:'redking',title:'海湾入侵者',hp:110,color:0xffcb7a,attacks:['bolt','charge','slam']},
   {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:210,color:0x68d9ff,attacks:['bolt','charge','sweep']},
-  {name:'巴尔坦星人 · 量产型',model:'baltan-basic',title:'分身战术',hp:235,color:0x5fd0ff,attacks:['bolt','sweep','charge']},
   {name:'加恩Q',model:'ganq',title:'巨眼的凝视',hp:185,color:0xee596d,attacks:['bolt','sweep','charge']},
   {name:'美菲拉斯星人',model:'mefilas',title:'幻影突袭',hp:200,color:0x62cfff,attacks:['sweep','bolt','charge']},
-  {name:'巴尔坦星人 · 强化体',model:'baltan-powered',title:'能量增幅',hp:250,color:0x7ee0ff,attacks:['bolt','charge','sweep']},
-  {name:'机械巴尔坦',model:'baltan-mecha',title:'改造追击者',hp:270,color:0x9ad7e8,attacks:['sweep','bolt','charge']},
   {name:'卡欧斯 · 赛文',model:'chaos-seven',title:'暗影头镖',hp:265,color:0xdc7bff,attacks:['bolt','sweep','charge']},
   {name:'卡欧斯 · 泰罗',model:'chaos-taro',title:'暗之王冠',hp:285,color:0xff9a7b,attacks:['sweep','bolt','charge']},
   {name:'卡欧斯 · 奥特曼',model:'chaos-ultraman',title:'光之逆影',hp:305,color:0xc7a6ff,attacks:['bolt','charge','sweep']},
@@ -23,11 +20,8 @@ export const CELEBRATION=Object.freeze({duration:7.5});
 export const MONSTER_ATTACK_NAMES={
   redking:{bolt:'岩石投掷',slam:'震地跺脚',melee:'近身直拳',charge:'蛮力冲锋'},
   baltan:{bolt:'钳爪光弹',sweep:'钳爪光线',melee:'钳爪突刺',charge:'幻影突进'},
-  'baltan-basic':{bolt:'分身光弹',sweep:'分身光线',melee:'钳爪突刺',charge:'影分身突进'},
   ganq:{bolt:'巨眼光弹',sweep:'巨眼射线',melee:'巨眼撞击',charge:'巨眼突进'},
   mefilas:{bolt:'星人光弹',sweep:'星人射线',melee:'星人直拳',charge:'瞬移突进'},
-  'baltan-powered':{bolt:'强化光弹',sweep:'增幅光线',melee:'钳爪猛击',charge:'能量冲锋'},
-  'baltan-mecha':{bolt:'机械光弹',sweep:'切割光线',melee:'钢爪突刺',charge:'推进冲锋'},
   'chaos-seven':{bolt:'艾梅利姆光弹',sweep:'头镖横扫',melee:'暗影格斗拳',charge:'暗影突进'},
   'chaos-taro':{bolt:'宇宙光弹',sweep:'王者射线',melee:'宇宙拳击',charge:'王冠冲锋'},
   'chaos-ultraman':{bolt:'斯派修姆光弹',sweep:'逆光斯派修姆',melee:'奥特拳',charge:'高速突进'},
