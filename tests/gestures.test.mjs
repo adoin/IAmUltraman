@@ -114,3 +114,13 @@ test('a waist-high spare hand with a forward arm is enough for the palm sword',(
   for(let t=0;t<=1200;t+=80)if(r.update(waist,t).skill==='palm')fired++;
   assert.equal(fired,1);
 });
+
+test('a guard interrupts the beam dwell instead of storing charge across poses',()=>{const r=new GestureRecognizer(),guard=pose({11:[250,180],12:[390,180],13:[220,300],15:[390,180],14:[420,300],16:[250,180]});r.update(cross,0);r.update(cross,300);r.update(guard,350);r.update(guard,550);assert.equal(r.update(cross,650).skill,null);assert.equal(r.update(cross,1000).skill,null);assert.equal(r.update(cross,1100).skill,'beam');});
+
+test('lost wrists and complete tracking loss clear every gathered ray stage',()=>{for(const missing of [null,'wrist']){const r=new GestureRecognizer();for(let t=0;t<=400;t+=100)r.update(gatherPose,t);const hidden=structuredClone(gatherPose);hidden[15].visibility=0;r.update(missing===null?null:hidden,500);for(let t=600;t<=1600;t+=100)assert.notEqual(r.update(lPose,t).skill,'zepellion');}});
+
+test('holding the gather longer refreshes the window until the child forms an L',()=>{const r=new GestureRecognizer();for(let t=0;t<=5000;t+=100)r.update(gatherPose,t);let fired=0;for(let t=5100;t<=6100;t+=100)if(r.update(lPose,t).skill==='zepellion')fired++;assert.equal(fired,1);});
+
+test('L forearms touching at an endpoint are not mistaken for a crossing beam',()=>{const r=new GestureRecognizer(),touch=structuredClone(lPose);touch[16].x=touch[13].x;touch[16].y=touch[13].y;for(let t=0;t<=400;t+=100)r.update(gatherPose,t);const fired=[];for(let t=500;t<=1500;t+=100){const out=r.update(touch,t);if(out.skill)fired.push(out.skill);}assert.deepEqual(fired,['zepellion']);});
+
+test('switching palm hands requires a new dwell and preserves the firing side',()=>{const r=new GestureRecognizer(),left=palmPush(),right=structuredClone(left);for(const [a,b]of [[11,12],[13,14],[15,16]])[right[a],right[b]]=[right[b],right[a]];r.update(left,0);r.update(left,300);r.update(right,350);assert.equal(r.update(right,600).skill,null);const out=r.update(right,900);assert.equal(out.skill,'palm');assert.equal(out.skillSide,'right');});

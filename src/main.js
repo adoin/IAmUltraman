@@ -15,10 +15,12 @@ let calloutTimer;
 function say(text,duration=1800){$('callout').textContent=text;$('callout').classList.add('visible');clearTimeout(calloutTimer);calloutTimer=setTimeout(()=>$('callout').classList.remove('visible'),duration);}
 function battleEvent(event){
   if(scene)audio.event(event,scene);
+  if(event.type==='wave-loading'||event.type==='wave-load-error'){$('wave-loading').hidden=false;$('wave-loading-title').textContent=event.info.name;$('wave-loading-message').textContent=event.type==='wave-loading'?'下一场战斗正在准备，请稍候…':'怪兽暂时没有出现，请检查网络后重试。';$('retry-wave').hidden=event.type!=='wave-load-error';clearDefense();audio.setActive(false);}
+  if(event.type==='wave-ready'){$('wave-loading').hidden=true;syncPause();}
   if(event.type==='state'){$('wave').textContent=event.wave;$('score').textContent=`守护星星 ${event.stars}`;$('hero-health').style.width=event.hero+'%';$('monster-health').style.width=event.monster+'%';$('hero-hp').textContent=`${Math.ceil(event.hero)} / 100`;$('monster-hp').textContent=`${Math.ceil(event.monsterHP)} / ${event.monsterMax}`;$('monster-name').textContent=event.info.name;$('monster-type').textContent=event.info.title;$('mission-number').textContent=String(event.wave).padStart(2,'0');$('guard-fill').style.width=event.guard+'%';$('guard-value').textContent=Math.ceil(event.guard);}
   if(event.type==='cast'){say(CAST_LINES[event.skill]||'光之力量！',1000);log('释放 '+event.skill);}
   if(event.type==='defeat'){say('太棒了！又守护了一片街区',2000);$('scene-status').textContent='怪兽退散，城市的灯又亮起来了';}
-  if(event.type==='wave'){say(event.wave===WAVES.length?'最后一战，相信光！':`第 ${event.wave} 波 · 新的挑战`);$('scene-status').textContent='摆出招式，守护城市';}
+  if(event.type==='wave'){if(!scene.loading)$('wave-loading').hidden=true;say(event.wave===WAVES.length?'最后一战，相信光！':`第 ${event.wave} 波 · 新的挑战`);$('scene-status').textContent='摆出招式，守护城市';}
   if(event.type==='attacked'){$('scene-status').textContent='守护能量正在消耗，释放绝招击退怪兽';}
   if(event.type==='telegraph'){$('threat').hidden=false;$('threat-name').textContent=`${event.config.name} · 正在蓄力`;$('threat-hint').textContent=event.attack.kind==='sweep'?`向${event.attack.safeSide>0?'右':'左'}侧身，或交叉双臂防御`:event.config.hint;}
   if(event.type==='enemy-cast'){$('threat-name').textContent=`${event.attack.name||ATTACKS[event.attack.kind].name} · 来了！`;}
@@ -50,7 +52,7 @@ function enterBattleView(){document.body.classList.add('in-battle');$('game').fo
 function leaveBattleView(){document.body.classList.remove('in-battle');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});scene.resize?.();}
 function log(text){state.debug.unshift(`${new Date().toLocaleTimeString()} ${text}`);state.debug=state.debug.slice(0,6);}
 async function start(){await audio.unlock();if(state.started)return;if(state.starting)return;state.starting=true;try{await scene.ready;if(pose.promise)await pose.promise.catch(()=>{});if(state.mode==='camera')await waitForInputFrame(state.epoch);state.started=true;enterBattleView();audio.setActive(true);scene.start();$('welcome').hidden=true;$('pause').hidden=false;$('scene-status').textContent='十字发光线 · 胸前交叉开护盾 · 侧身躲攻击';say('相信自己，相信光！');syncPause();}catch{$('load-status').textContent='游戏尚未准备好，请检查影像或刷新重试';}finally{state.starting=false;}}
-function syncPause(){scene.paused=state.manualPause||!!document.querySelector('dialog[open]')||document.hidden;audio.setActive(state.started&&!scene.paused&&(!scene.finished||scene.celebrating>0));}
+function syncPause(){scene.paused=state.manualPause||!!document.querySelector('dialog[open]')||document.hidden;audio.setActive(state.started&&!scene.loading&&!scene.paused&&(!scene.finished||scene.celebrating>0));}
 function manualPause(value){if(!state.started||scene.finished)return;clearDefense();state.manualPause=value;if(value)leaveBattleView();else enterBattleView();$('pause-panel').hidden=!value;$('resume').hidden=false;$('pause-panel').querySelector('h2').textContent='小英雄休息中';$('pause-panel').querySelector('p').textContent='准备好了，就继续守护城市。';$('pause-panel').querySelector('.little-tag').textContent='补充一点光的力量';$('pause').textContent=value?'▶':'Ⅱ';$('pause').setAttribute('aria-label',value?'继续游戏':'暂停游戏');recognizer.reset();syncPause();}
 async function cast(skill,side='right'){audio.unlock();if(!state.started)await start();scene.cast(skill,side);}
 $('start-keyboard').onclick=()=>{if(video||state.pending||state.mode!=='keyboard')stopInput();return start();};
@@ -60,6 +62,7 @@ $('game').addEventListener('click',()=>{if(document.body.classList.contains('in-
 $('game').addEventListener('touchstart',e=>{if(e.touches.length>1&&document.body.classList.contains('in-battle')){e.preventDefault();manualPause(true);}},{passive:false});
 $('beam-button').onclick=()=>cast('beam');$('zepellion-button').onclick=()=>cast('zepellion');$('disc-button').onclick=()=>cast('disc');$('palm-button').onclick=()=>cast('palm');
 $('pause').onclick=()=>manualPause(!state.manualPause);$('resume').onclick=async()=>{if(pose.promise)await pose.promise.catch(()=>{});manualPause(false);};
+$('retry-wave').onclick=()=>scene.selectMonster?.();
 $('restart').onclick=async()=>{if(pose.promise)await pose.promise.catch(()=>{});clearDefense();$('threat').hidden=true;$('celebration').hidden=true;document.body.classList.remove('celebrating');enterBattleView();audio.setActive(true);scene.start();state.manualPause=false;$('pause-panel').hidden=true;recognizer.reset();syncPause();say('新的冒险，出发！');};
 const heldKeys=new Set(['a','d','l','arrowleft','arrowright']);
 const battleKeys=new Set([...heldKeys,'w','f','z','x','j','u','k','o','p','escape',' ']);
@@ -67,6 +70,7 @@ function gameplayKey(event){
   if(event.ctrlKey||event.altKey||event.metaKey||event.isComposing)return '';
   if(document.querySelector('dialog[open]')||event.target?.closest?.('input,select,textarea,[contenteditable="true"]'))return '';
   const key=event.key.toLowerCase();
+  if(key===' '&&event.target?.closest?.('button,a'))return '';
   if(!battleKeys.has(key))return '';
   if(document.body.classList.contains('in-battle')){
     event.preventDefault();
@@ -99,7 +103,7 @@ window.addEventListener('keyup',event=>{
 },{capture:true});
 function clearDefense(){
   state.keys.clear();state.gestureGuard=false;state.gestureLean=0;state.dodgeUntil=0;
-  scene.setDefense(false,0);scene.lowerShield();scene.setDiscPreparation(null);
+  scene.setDefense(false,0);scene.lowerShield();scene.setDiscPreparation(null);scene.setPoseStage?.(0);
 }
 window.addEventListener('blur',clearDefense);
 $('guard-button').onclick=async()=>{
@@ -114,7 +118,7 @@ $('difficulty').onchange=e=>scene.difficulty=e.target.value;
 $('quality').onchange=e=>scene.setQuality?.(e.target.value);
 $('recenter').onclick=()=>{recognizer.reset();state.gestureLean=0;state.gestureGuard=false;log('已校准侧身中心');};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.querySelector('.arena').requestFullscreen();}catch{say('浏览器不支持全屏，可横屏游玩');}};
-for(const [id,button] of [['help-dialog','help'],['settings-dialog','settings'],['credits-dialog','credits']]){const dialog=$(id);$(button).onclick=()=>{dialog.showModal();syncPause();};dialog.addEventListener('close',()=>{recognizer.reset();syncPause();});dialog.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>dialog.close());dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});}
+for(const [id,button] of [['help-dialog','help'],['settings-dialog','settings'],['credits-dialog','credits']]){const dialog=$(id);$(button).onclick=()=>{dialog.showModal();clearDefense();syncPause();};dialog.addEventListener('close',()=>{recognizer.reset();clearDefense();syncPause();});dialog.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>dialog.close());dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});}
 document.addEventListener('visibilitychange',()=>{recognizer.reset();clearDefense();syncPause();});
 $('sound').onclick=()=>{state.sound=!state.sound;audio.setEnabled(state.sound);updateSound();};
 function updateSound(){$('sound').setAttribute('aria-pressed',String(state.sound));$('sound').setAttribute('aria-label',state.sound?'关闭声音':'开启声音');$('sound').textContent=state.sound?'♪':'♩';}updateSound();
@@ -148,7 +152,7 @@ function releaseVideo(){
   video.remove();
   video=null;
 }
-function setMode(mode){state.mode=mode;state.lastFrame=-1;recognizer.reset();$('input-label').textContent=mode==='camera'?'摄像头体感':mode==='video'?'动作视频回放':'按键 / 点击操作';$('camera-empty').hidden=mode!=='keyboard';$('replay-controls').hidden=mode!=='video';$('camera-toggle').textContent=mode==='camera'?'关闭摄像头':'开启摄像头';$('tracking-tip').hidden=true;$('gesture-status').textContent=mode==='keyboard'?'点击招式卡，或按 J / K 释放绝招':'让肩膀、手肘和双手完整入镜';}
+function setMode(mode){scene.setPoseStage?.(0);scene.setDiscPreparation(null);state.mode=mode;state.lastFrame=-1;recognizer.reset();$('input-label').textContent=mode==='camera'?'摄像头体感':mode==='video'?'动作视频回放':'按键 / 点击操作';$('camera-empty').hidden=mode!=='keyboard';$('replay-controls').hidden=mode!=='video';$('camera-toggle').textContent=mode==='camera'?'关闭摄像头':'开启摄像头';$('tracking-tip').hidden=true;$('gesture-status').textContent=mode==='keyboard'?'点击招式卡，或按 J / K 释放绝招':'让肩膀、手肘和双手完整入镜';}
 let inputWaiter=null,firstFrameEpoch=-1;
 function waitForInputFrame(epoch){
   if(firstFrameEpoch===epoch)return Promise.resolve();if(inputWaiter?.epoch===epoch)return inputWaiter.promise;
@@ -191,9 +195,9 @@ function updateShieldCard(){
   touch.setAttribute('aria-pressed',String(active));
   touch.textContent=cooldown>0?'护盾 '+seconds(cooldown)+'s':'护盾';
 }
-async function detectLoop(now){audio.update(scene);if(state.workerReady&&!state.busy&&state.mode!=='keyboard'&&video&&!video.paused&&video.readyState>=2&&now-state.lastDetect>=65&&video.currentTime!==state.lastFrame){state.busy=true;state.lastDetect=now;state.lastFrame=video.currentTime;const epoch=state.epoch;try{const scale=Math.min(1,640/video.videoWidth);const bitmap=await createImageBitmap(video,{resizeWidth:Math.round(video.videoWidth*scale),resizeHeight:Math.round(video.videoHeight*scale)});if(epoch!==state.epoch||!state.workerReady){bitmap.close();state.busy=false;}else if(!pose.sendFrame(bitmap,performance.now(),epoch))state.busy=false;}catch{if(epoch===state.epoch){state.busy=false;$('camera-state').textContent='无法读取视频帧，请重开影像';}}}
-  if(state.mode!=='keyboard'&&state.workerReady&&now-state.lastResult>2500){recognizer.reset();scene.setDiscPreparation(null);state.gestureGuard=false;state.gestureLean=0;$('tracking-tip').hidden=false;$('tracking-tip').textContent='影像暂时没有更新，可重开摄像头或检查视频播放';}else $('tracking-tip').textContent='让肩膀、手肘和双手都出现在画面里';
-  for(const skill of ['beam','zepellion','disc','palm']){const cd=SKILLS[skill].cooldown;const remaining=Math.max(0,cd-(scene.time-scene.lastCast[skill]));$(skill+'-cooldown').style.width=(remaining/cd*100)+'%';const stage=skill==='zepellion'?(scene.zepellionStage|0):0;const label=stage===1?'聚气完成 · 摆 L 形':stage===2?'L 形成形 · 蓄力中':remaining>0?'冷却 '+(Math.ceil(remaining*10)/10).toFixed(1)+' 秒':scene.inMelee?'近身中':'就绪';if($(skill+'-status').textContent!==label)$(skill+'-status').textContent=label;$(skill+'-button').classList.toggle('is-cooling',remaining>0);$(skill+'-button').setAttribute('aria-disabled',String(remaining>0||scene.inMelee));const touch=document.querySelector('[data-battle='+skill+']');if(touch)touch.textContent=SKILL_SHORT[skill]+(remaining>0?' '+remaining.toFixed(1)+'s':'');$(skill+'-button').setAttribute('aria-label',SKILL_NAMES[skill]+(remaining>0?`，冷却 ${remaining.toFixed(1)} 秒`:scene.inMelee?'，先用普通拳拉开距离':'，可以释放'));}syncDefenseInput(now);updateShieldCard();if(scene.attack){const a=scene.attack;const progress=a.phase==='windup'?a.age/a.windup:1;$('threat-fill').style.width=Math.min(100,progress*100)+'%';}requestAnimationFrame(detectLoop);}
+async function detectLoop(now){const loadingPanel=$('wave-loading'),showLoading=!!scene.loading;if(loadingPanel.hidden===showLoading)loadingPanel.hidden=!showLoading;audio.update(scene);if(state.workerReady&&!state.busy&&state.mode!=='keyboard'&&video&&!video.paused&&video.readyState>=2&&now-state.lastDetect>=65&&video.currentTime!==state.lastFrame){state.busy=true;state.lastDetect=now;state.lastFrame=video.currentTime;const epoch=state.epoch;try{const scale=Math.min(1,640/video.videoWidth);const bitmap=await createImageBitmap(video,{resizeWidth:Math.round(video.videoWidth*scale),resizeHeight:Math.round(video.videoHeight*scale)});if(epoch!==state.epoch||!state.workerReady){bitmap.close();state.busy=false;}else if(!pose.sendFrame(bitmap,performance.now(),epoch))state.busy=false;}catch{if(epoch===state.epoch){state.busy=false;$('camera-state').textContent='无法读取视频帧，请重开影像';}}}
+  if(state.mode!=='keyboard'&&state.workerReady&&now-state.lastResult>2500){recognizer.reset();scene.setPoseStage?.(0);scene.setDiscPreparation(null);state.gestureGuard=false;state.gestureLean=0;$('tracking-tip').hidden=false;$('tracking-tip').textContent='影像暂时没有更新，可重开摄像头或检查视频播放';}else $('tracking-tip').textContent='让肩膀、手肘和双手都出现在画面里';
+  for(const skill of ['beam','zepellion','disc','palm']){const cd=SKILLS[skill].cooldown;const remaining=Math.max(0,cd-(scene.time-scene.lastCast[skill]));$(skill+'-cooldown').style.width=(remaining/cd*100)+'%';const stage=skill==='zepellion'?(scene.zepellionStage|0):0;const label=remaining<=0&&!scene.inMelee&&stage===1?'聚气完成 · 摆 L 形':remaining<=0&&!scene.inMelee&&stage===2?'L 形成形 · 蓄力中':remaining>0?'冷却 '+(Math.ceil(remaining*10)/10).toFixed(1)+' 秒':scene.inMelee?'近身中':'就绪';if($(skill+'-status').textContent!==label)$(skill+'-status').textContent=label;$(skill+'-button').classList.toggle('is-cooling',remaining>0);$(skill+'-button').setAttribute('aria-disabled',String(remaining>0||scene.inMelee));const touch=document.querySelector('[data-battle='+skill+']');if(touch)touch.textContent=SKILL_SHORT[skill]+(remaining>0?' '+remaining.toFixed(1)+'s':'');$(skill+'-button').setAttribute('aria-label',SKILL_NAMES[skill]+(remaining>0?`，冷却 ${remaining.toFixed(1)} 秒`:scene.inMelee?'，先用普通拳拉开距离':'，可以释放'));}syncDefenseInput(now);updateShieldCard();if(scene.attack){const a=scene.attack;const progress=a.phase==='windup'?a.age/a.windup:1;$('threat-fill').style.width=Math.min(100,progress*100)+'%';}requestAnimationFrame(detectLoop);}
 requestAnimationFrame(detectLoop);
 makeWorker().catch(()=>{});
 window.addEventListener('pagehide',()=>{audio.setActive(false);stopInput({dispose:true});});

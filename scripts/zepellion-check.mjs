@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import {ZEPELLION_TIMING} from '../src/action-timing.js';
 
 const base = process.env.GAME_URL || 'http://127.0.0.1:4173';
-const out = 'artifacts/poses';
+const out = process.env.BROWSER_ARTIFACT_DIR || 'D:/tmp/ultraman-zepellion-check';
 mkdirSync(out, {recursive: true});
 const DIFFERENCE = 0.12; // world units between the two hand rigs' poses
 const {reach, pull, cross, fire, lightEnd, end} = ZEPELLION_TIMING;
@@ -23,7 +23,7 @@ assert.ok(reach < pull && pull < cross && cross <= fire, 'reach -> pull -> cross
 assert.ok(pull - reach >= 0.4 && cross - pull >= 0.4, 'each wind-up beat needs its own time');
 assert.ok(lightEnd > fire && end > lightEnd, 'the light must outlast the shot');
 
-const browser = await chromium.launch({channel: 'chrome', headless: true});
+const browser = await chromium.launch({...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{channel:'chrome'}),headless:true});
 const page = await browser.newPage({viewport: {width: 640, height: 420}});
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
@@ -50,7 +50,7 @@ await page.evaluate(`(async()=>{
     return out.map(v=>[+v.x.toFixed(3),+v.y.toFixed(3),+v.z.toFixed(3)]);
   };
   window.__castThenSample=(skill,ages)=>{
-    b.attack=null;b.nextAttack=1e9;b.lastCast[skill]=-100;b.effects=[];
+    b.start();b.attack=null;b.nextAttack=1e9;b.lastCast[skill]=-100;b.effects=[];
     b.cast(skill);
     const samples=[];let t=0;
     for(const age of ages){while(t<age-1e-6){b.advance(1/60);t+=1/60;}samples.push({age,t:+t.toFixed(2),hands:window.__hands()});b.renderer.render(b.renderScene,b.camera);}
@@ -63,24 +63,16 @@ await page.evaluate(`(async()=>{
 const flat = (samples) => samples.map((sample) => sample.hands.flat());
 const distance = (a, b) => Math.sqrt(a.reduce((sum, value, i) => sum + (value - b[i]) ** 2, 0) / a.length);
 
-// Mebium ray reference at its ready/impact beats.
-const beam = await page.evaluate(() => window.__castThenSample('beam', [0.2, 0.32, 0.6]));
-await page.evaluate(() => window.__label('梅特里姆光线 · 起手'));
-await page.screenshot({path: join(out, 'zepellion-beam-ready.jpg'), type: 'jpeg', quality: 74});
-
-// Zepellion: the three wind-up beats, then the shot.
-const zep = await page.evaluate(
-  ([r, p, c, f]) => window.__castThenSample('zepellion', [r, p, c, f]),
-  [reach, pull, cross, fire + 0.08],
-);
-await page.evaluate(() => window.__label('哉佩利敖光线 ①伸臂'));
-await page.screenshot({path: join(out, 'zepellion-reach.jpg'), type: 'jpeg', quality: 74});
-await page.evaluate(() => window.__label('哉佩利敖光线 ②横拉'));
-await page.screenshot({path: join(out, 'zepellion-pull.jpg'), type: 'jpeg', quality: 74});
-await page.evaluate(() => window.__label('哉佩利敖光线 ③摆十字'));
-await page.screenshot({path: join(out, 'zepellion-cross.jpg'), type: 'jpeg', quality: 74});
-await page.evaluate(() => window.__label('哉佩利敖光线 · 发射'));
-await page.screenshot({path: join(out, 'zepellion-fire.jpg'), type: 'jpeg', quality: 74});
+// Capture each actual phase before advancing to another sample.
+const beam=[];
+for(const age of [.2,.32,.6]){const [sample]=await page.evaluate(age=>window.__castThenSample('beam',[age]),age);beam.push(sample);if(age===.32){await page.evaluate(()=>window.__label('梅特里姆光线 · 起手'));await page.screenshot({path:join(out,'zepellion-beam-ready.jpg'),type:'jpeg',quality:74});}}
+const zep=[],files=['reach','pull','cross','fire'],labels=['①伸臂','②横拉','③定姿','发射'];
+for(const [i,age]of [reach,pull,cross,fire+.16].entries()){
+ const [sample]=await page.evaluate(age=>window.__castThenSample('zepellion',[age]),age);zep.push(sample);
+ await page.evaluate(label=>window.__label('哉佩利敖光线 '+label),labels[i]);
+ await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+ await page.screenshot({path:join(out,'zepellion-'+files[i]+'.jpg'),type:'jpeg',quality:74});
+}
 
 const beamReady = flat([beam[1]])[0];
 const zepReach = flat([zep[0]])[0];
@@ -93,9 +85,11 @@ const crossVsBeam = distance(zepCross, beamReady);
 assert.ok(reachVsBeam >= DIFFERENCE, `the reach beat must differ from the Mebium ready pose (${reachVsBeam.toFixed(3)})`);
 assert.ok(reachVsPull >= DIFFERENCE * 0.6, `the wide pull must move the arms (${reachVsPull.toFixed(3)})`);
 assert.ok(pullVsCross >= DIFFERENCE * 0.6, `the cross must snap out of the pull (${pullVsCross.toFixed(3)})`);
-assert.ok(crossVsBeam >= DIFFERENCE / 2, `the L form must differ from the Mebium pose (${crossVsBeam.toFixed(3)})`);
+const settled=distance(zepCross,flat([zep[3]])[0]);
+assert.ok(settled<.03,`the final firing pose must be complete before emission (${settled.toFixed(3)})`);
 
 // The HUD has to show the pre-motion stages without a camera.
+await page.evaluate(()=>{window.__b.effects=[];window.__b.lastCast.zepellion=-100;});
 const hud = [];
 for (const stage of [1, 2, 0]) {
   await page.evaluate((value) => {

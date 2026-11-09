@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "ultra-little-heroes",
   "version": "2.0.0",
   "private": true,
@@ -17,7 +17,8 @@
     "test:enemies": "node scripts/enemy-attacks-check.mjs",
     "test:feedback": "node scripts/combat-feedback-check.mjs",
     "test:poses": "node scripts/monster-pose-check.mjs",
-    "test:zepellion": "node scripts/zepellion-check.mjs"
+    "test:zepellion": "node scripts/zepellion-check.mjs",
+    "test:reliability": "node scripts/reliability-check.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.32",

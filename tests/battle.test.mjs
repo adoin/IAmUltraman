@@ -104,12 +104,20 @@ test('later waves attack sooner: the monster stops standing around',()=>{
   for (let i = 1; i < delays.length; i++) {
     assert.ok(delays[i] <= delays[i - 1], `wave ${i + 1} must not wait longer than wave ${i}`);
   }
-  assert.ok(delays[0] >= 3.6, `wave 1 should give the player room to learn (${delays[0]})`);
-  assert.ok(delays.at(-1) <= 1.6, `the last wave must press the attack (${delays.at(-1)})`);
-  assert.ok(delays[0] - delays.at(-1) >= 2.2, 'the ramp has to be felt, not just measurable');
+  assert.ok(delays[0]>=1.5&&delays[0]<=2, `wave 1 should give the player room to learn (${delays[0]})`);
+  assert.ok(delays.at(-1)>=.85&&delays.at(-1)<=1, `the last wave must press the attack (${delays.at(-1)})`);
+  assert.ok(delays[0]-delays.at(-1)>=.8, 'the ramp has to be felt, not just measurable');
   s.difficulty = 'normal';
   const normal = WAVES.map((_, index) => { s.wave = index + 1; return s.attackDelay(); });
   assert.ok(normal.every((value, index) => value <= delays[index]), 'normal never waits longer than easy');
   s.wave = WAVES.length;
   assert.ok(normal.at(-1) <= 1.3, `normal must stay brisk at the end (${normal.at(-1)})`);
 });
+
+test('streaming a monster freezes combat and rejects input without spending cooldowns',()=>{const b=new BattleEngine();b.start();b.loading=true;const before={time:b.time,hp:b.heroHealth,cd:{...b.lastCast}};assert.equal(b.cast('beam'),false);assert.equal(b.punch('left'),false);assert.equal(b.raiseShield(),false);b.setDiscPreparation({side:'right',armed:true,progress:1});b.update(10);assert.equal(b.time,before.time);assert.equal(b.heroHealth,before.hp);assert.deepEqual(b.lastCast,before.cd);assert.equal(b.discGesture,null);b.loading=false;assert.equal(b.cast('beam'),true);});
+
+test('the opening ranged shot launches before a held finisher can erase its wind-up',()=>{const {scene:s,events}=battle();s.cast('zepellion');advance(s,3.65);assert.ok(events.some(e=>e.type==='enemy-cast'&&e.attack.kind==='bolt'));assert.equal(s.stats.damageTaken,14);assert.equal(s.cast('disc'),true);advance(s,1.2);assert.equal(s.defeated,true);assert.equal(s.stats.damageTaken,14,'two offensive skills alone no longer bypass every incoming strike');});
+
+test('the faster opener still leaves time to dodge or raise a shield after launch',()=>{for(const outcome of ['block','dodge']){const {scene:s}=battle();advance(s,1.95);assert.equal(s.attack.phase,'flight');s.setDefense(outcome==='block',outcome==='dodge'?1:0);advance(s,1.2);assert.equal(s.heroHealth,100);assert.equal(s.stats[outcome==='block'?'blocked':'dodged'],1);}});
+
+test('a staggered monster resumes pressure after a short recovery, not a full rest',()=>{const {scene:s}=battle();s.beginAttack('slam');s.cast('beam');advance(s,.7);assert.equal(s.attack,null);assert.ok(s.nextAttack>0&&s.nextAttack<=.85);advance(s,1);assert.ok(s.attack);});

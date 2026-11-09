@@ -1,9 +1,9 @@
 ﻿/** Original synthesized score and effects; all voices are bundled, never inferred in battle. */
 import {SKILLS} from './combat.js';
-import {ZEPELLION_TIMING} from './action-timing.js';
+import {ZEPELLION_TIMING,DISC_TIMING} from './action-timing.js';
 
 export class GameAudio {
-  constructor(){this.enabled=true;this.musicEnabled=true;this.voiceEnabled=true;this.active=false;this.voices=new Map();this.voiceHistory=new Map();this.finisherWave=0;this.hurtIndex=0;this.musicStep=0;this.musicURL=null;this.generation=0;}
+  constructor(){this.scheduled=new Map();this.enabled=true;this.musicEnabled=true;this.voiceEnabled=true;this.active=false;this.voices=new Map();this.voiceHistory=new Map();this.finisherWave=0;this.hurtIndex=0;this.musicStep=0;this.musicURL=null;this.generation=0;}
   async unlock(){
     if(!this.enabled)return;
     try{if(!this.context){const a=this.context=new(window.AudioContext||window.webkitAudioContext)();this.master=a.createGain();this.master.gain.value=.65;const limiter=a.createDynamicsCompressor();limiter.threshold.value=-15;limiter.ratio.value=6;this.master.connect(limiter).connect(a.destination);this.musicGain=a.createGain();this.musicGain.gain.value=.16;this.musicGain.connect(this.master);this.fxGain=a.createGain();this.fxGain.gain.value=.5;this.fxGain.connect(this.master);this.voiceGain=a.createGain();this.voiceGain.gain.value=.95;this.voiceGain.connect(this.master);
@@ -20,10 +20,12 @@ export class GameAudio {
     })();
   }
   async preload(){const generation=this.generation;for(const [name,bytes]of await this.prepare()){try{const buffer=await this.context.decodeAudioData(bytes.slice(0));if(generation===this.generation)this.voices.set(name,buffer);}catch{}}}
+  track(source,kind){this.scheduled.set(source,kind);source.onended=()=>this.scheduled.delete(source);}
+  stopScheduled(kind){for(const [source,type]of this.scheduled){if(kind&&type!==kind)continue;try{source.stop();}catch{}this.scheduled.delete(source);}}
   note(frequency,duration,volume=.2,type='sine',when=this.context.currentTime,bus=this.fxGain,to=null,pan=0){
-    const a=this.context,o=a.createOscillator(),gain=a.createGain();o.type=type;o.frequency.setValueAtTime(frequency,when);if(to)o.frequency.exponentialRampToValueAtTime(Math.max(20,to),when+duration);gain.gain.setValueAtTime(.0001,when);gain.gain.exponentialRampToValueAtTime(volume,when+.008);gain.gain.exponentialRampToValueAtTime(.0001,when+duration);let output=gain;if(pan&&a.createStereoPanner){const p=a.createStereoPanner();p.pan.value=pan;gain.connect(p);output=p;}o.connect(gain);output.connect(bus);o.start(when);o.stop(when+duration+.02);
+    const a=this.context,o=a.createOscillator(),gain=a.createGain();o.type=type;o.frequency.setValueAtTime(frequency,when);if(to)o.frequency.exponentialRampToValueAtTime(Math.max(20,to),when+duration);gain.gain.setValueAtTime(.0001,when);gain.gain.exponentialRampToValueAtTime(volume,when+.008);gain.gain.exponentialRampToValueAtTime(.0001,when+duration);let output=gain;if(pan&&a.createStereoPanner){const p=a.createStereoPanner();p.pan.value=pan;gain.connect(p);output=p;}o.connect(gain);output.connect(bus);this.track(o,bus===this.musicGain?'music':'effect');o.start(when);o.stop(when+duration+.02);
   }
-  noise(duration,volume,frequency,when,pan=0){const a=this.context,source=a.createBufferSource(),filter=a.createBiquadFilter(),gain=a.createGain();source.buffer=this.noiseBuffer;filter.type='lowpass';filter.frequency.setValueAtTime(frequency,when);filter.frequency.exponentialRampToValueAtTime(180,when+duration);gain.gain.setValueAtTime(volume,when);gain.gain.exponentialRampToValueAtTime(.0001,when+duration);source.connect(filter).connect(gain);if(pan&&a.createStereoPanner){const p=a.createStereoPanner();p.pan.value=pan;gain.connect(p).connect(this.fxGain);}else gain.connect(this.fxGain);source.start(when);source.stop(when+duration);}
+  noise(duration,volume,frequency,when,pan=0){const a=this.context,source=a.createBufferSource(),filter=a.createBiquadFilter(),gain=a.createGain();source.buffer=this.noiseBuffer;filter.type='lowpass';filter.frequency.setValueAtTime(frequency,when);filter.frequency.exponentialRampToValueAtTime(180,when+duration);gain.gain.setValueAtTime(volume,when);gain.gain.exponentialRampToValueAtTime(.0001,when+duration);source.connect(filter).connect(gain);if(pan&&a.createStereoPanner){const p=a.createStereoPanner();p.pan.value=pan;gain.connect(p).connect(this.fxGain);}else gain.connect(this.fxGain);this.track(source,'effect');source.start(when);source.stop(when+duration);}
   /**
    * Every kaiju gets its own voice colour from the same small synth. Later
    * waves sit lower and rougher, so the final boss sounds nothing like wave 1.
@@ -77,7 +79,7 @@ export class GameAudio {
       this.note(210*pitch,.22,.14,'sawtooth',now,bus,110*pitch);
     }
   }
-  effect(kind,side){if(!this.enabled||!this.context||!this.active)return;const now=this.context.currentTime,pan=side==='left'?-.35:side==='right'?.35:0;
+  effect(kind,side,timing){if(!this.enabled||!this.context||!this.active)return;const now=this.context.currentTime,pan=side==='left'?-.35:side==='right'?.35:0;
     if(kind==='punch'){this.noise(.16,.17,3500,now,pan);return;}
     if(kind==='hit'||kind==='hurt'){this.noise(.18,.5,kind==='hurt'?1200:2200,now,pan);this.note(kind==='hurt'?95:155,.23,.45,'sine',now,this.fxGain,36,pan);return;}
     if(kind==='beam'){this.note(150,.55,.2,'sawtooth',now,this.fxGain,750);this.noise(1.1,.38,6000,now+.48);this.note(180,.9,.21,'triangle',now+.48,this.fxGain,65);return;}
@@ -98,7 +100,7 @@ export class GameAudio {
       this.note(430,1.3,.15,'sine',now+fire+.05,this.fxGain,45);
       return;
     }
-    if(kind==='disc'){this.note(430,.45,.22,'triangle',now,this.fxGain,1500);this.noise(.35,.24,5500,now+.22,pan);return;}
+    if(kind==='disc'){const release=timing?.release??DISC_TIMING.release;this.note(430,release,.22,'triangle',now,this.fxGain,1500);this.noise(.35,.24,5500,now+release,pan);return;}
     if(kind==='palm'){this.note(1050,.3,.28,'triangle',now,this.fxGain,180);this.note(620,.26,.12,'sine',now+.02,this.fxGain,110);return;}
     if(kind==='guard'){this.noise(.13,.26,7000,now);[720,1080,1440].forEach(f=>this.note(f,.4,.08,'sine',now));return;}
     if(kind==='charge'){this.noise(.9,.22,2400,now);this.note(90,.6,.2,'triangle',now,this.fxGain,200);return;}
@@ -117,8 +119,8 @@ export class GameAudio {
       if(i%8===4)this.note(180,.06,.025,'triangle',t,this.musicGain,60);this.nextBeat+=step;
     }
   }
-  setActive(value){this.active=!!value;if(!value){this.nextBeat=0;this.stopVoice();}this.syncMusic();}
-  setEnabled(value){this.enabled=value;if(this.context)this.master.gain.setTargetAtTime(value?.65:0,this.context.currentTime,.04);if(!value)this.stopVoice();else this.unlock();this.syncMusic();}
+  setActive(value){this.active=!!value;if(!value){this.nextBeat=0;this.stopScheduled();this.stopVoice();}this.syncMusic();}
+  setEnabled(value){this.enabled=value;if(this.context)this.master.gain.setTargetAtTime(value?.65:0,this.context.currentTime,.04);if(!value){this.stopScheduled();this.stopVoice();}else this.unlock();this.syncMusic();}
   syncMusic(){if(this.musicElement){this.musicElement.volume=.22;if(this.active&&!this.ended&&this.enabled&&this.musicEnabled)this.musicElement.play().catch(()=>{});else this.musicElement.pause();}if(this.context)this.musicGain.gain.setTargetAtTime(this.active&&!this.ended&&this.enabled&&this.musicEnabled?.16:0,this.context.currentTime,.06);}
   setMusicFile(file){this.musicElement?.pause();if(this.musicURL)URL.revokeObjectURL(this.musicURL);this.musicURL=file?URL.createObjectURL(file):null;this.musicElement=file?new Audio(this.musicURL):null;if(this.musicElement)this.musicElement.loop=true;this.nextBeat=0;this.syncMusic();}
   stopVoice(){if(this.voiceSource){try{this.voiceSource.stop();}catch{}this.voiceSource=null;}this.voicePriority=0;this.syncMusic();}
@@ -126,10 +128,11 @@ export class GameAudio {
   fanfare(){if(!this.enabled||!this.context||!this.active)return;const now=this.context.currentTime;[587.33,739.99,880,1174.66,880,1174.66].forEach((frequency,index)=>this.note(frequency,.44,.16,'triangle',now+index*.13,this.fxGain));this.noise(.6,.13,6500,now);}
   event(event,battle){
     const model=battle?.waveInfo?.model;
-    if(event.type==='wave'){this.ended=false;this.syncMusic();this.finisherWave=0;this.speak('start',2,0);this.roar('enter',model);}
+    if(event.type==='remote-interrupted')this.stopScheduled('effect');
+    if(event.type==='wave'){this.stopScheduled('effect');this.ended=false;this.syncMusic();this.finisherWave=0;this.speak('start',2,0);this.roar('enter',model);}
     if(event.type==='punch')this.effect('punch',event.side);
     if(event.type==='hit')this.effect('hit',event.side);
-    if(event.type==='cast')this.effect(event.skill,event.side);
+    if(event.type==='cast')this.effect(event.skill,event.side,event.timing);
     if(event.type==='telegraph'){this.effect('warning');this.roar('attack',model);}
     if(event.type==='enemy-cast')this.monsterAttack(event.attack.kind,model);
     if(event.type==='attacked'){this.effect('hurt');this.speak(battle.heroHealth<=30?'low':this.hurtIndex++%2?'hurt2':'hurt1',2,14);}
@@ -141,8 +144,8 @@ export class GameAudio {
     if(event.type==='celebration-end'){this.ended=true;this.syncMusic();}
     if(event.type==='over'){this.ended=true;this.syncMusic();this.speak('hurt1',4,0);}
   }
-  update(b){if(!this.active||b.paused||!b.playing||b.finished||b.defeated)return;
-    if(b.enemyDistance>=26&&b.monsterHealth<=46&&b.monsterHealth>0&&b.time-b.lastCast.beam>=SKILLS.beam.cooldown&&!b.effects.some(e=>e.kind!=='punch')&&this.finisherWave!==b.wave){if(this.speak('finish',3,0))this.finisherWave=b.wave;}
+  update(b){if(!this.active||b.loading||b.paused||!b.playing||b.finished||b.defeated)return;
+    if(b.enemyDistance>=26&&b.monsterHealth<=SKILLS.beam.damage&&b.monsterHealth>0&&b.time-b.lastCast.beam>=SKILLS.beam.cooldown&&!b.effects.some(e=>e.kind!=='punch')&&this.finisherWave!==b.wave){if(this.speak('finish',3,0))this.finisherWave=b.wave;}
   }
-  dispose(){this.generation++;clearInterval(this.timer);this.stopVoice();this.musicElement?.pause();if(this.musicURL)URL.revokeObjectURL(this.musicURL);this.context?.close();}
+  dispose(){this.generation++;clearInterval(this.timer);this.stopScheduled();this.stopVoice();this.musicElement?.pause();if(this.musicURL)URL.revokeObjectURL(this.musicURL);this.context?.close();}
 }

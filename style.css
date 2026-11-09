@@ -36,3 +36,5 @@ body.celebrating .callout{top:32%}
 @media(prefers-reduced-motion:reduce){.celebration{animation:none}}
 .in-battle .arena > #celebration:not([hidden]){display:grid!important;position:fixed;top:max(12vh,88px);left:50%;z-index:6}
 
+
+.in-battle .arena>#wave-loading:not(#game):not([hidden]){display:flex!important;z-index:5;position:fixed}dialog{overscroll-behavior:contain}

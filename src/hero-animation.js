@@ -353,7 +353,7 @@ export class HeroAnimation {
     this.prepareLayout();
     this.action=null;this.recover=null;
     this.entry=null;
-    this.guard=0;this.discSide='right';this.preparing=false;
+    this.guard=0;this.discSide='right';this.palmSide='right';this.preparing=false;
     this.current=this.neutral.map(copyPose);
     this.rigs.forEach((rig,index)=>{rig.restore();rig.apply(this.current[index]);});
     this.updateSockets();
@@ -367,6 +367,7 @@ export class HeroAnimation {
     const wasPreparing=this.preparing;this.preparing=!!discPreparation&&!active&&!guard;
     if(this.preparing&&!wasPreparing){this.prepEntry=this.current.map(copyPose);this.prepAge=0;}
     if(this.preparing)this.prepAge+=dt;
+    if(palm)this.palmSide=palm.side||'right';
     if(disc||discPreparation)this.discSide=(disc||discPreparation).side||'right';
     if(active!==this.action){
       if(!active&&this.action&&this.action.age<this.action.duration-.03)this.recover={poses:this.current.map(copyPose),age:0};
@@ -382,7 +383,7 @@ export class HeroAnimation {
       const timing=beam.timing||(ultra?ZEPELLION_TIMING:BEAM_TIMING);
       const t=beam.age;
       if(ultra){
-        const [reach,pull,cross]=[this.zepReach,this.zepPull,this.beamBase];
+        const [reach,pull,cross]=[this.zepReach,this.zepPull,this.beam];
         if(t<timing.reach){
           const phase=t/timing.reach;
           target=[blend(this.entry[0],reach[0],phase),blend(this.entry[1],reach[1],phase*.92)];
@@ -393,8 +394,7 @@ export class HeroAnimation {
           const phase=(t-timing.pull)/(timing.cross-timing.pull);
           target=[blend(pull[0],cross[0],phase),blend(pull[1],cross[1],phase*.9)];
         }else if(t<timing.lightEnd){
-          const lead=clamp((t-timing.cross)/.16,0,1);
-          target=lead<1?this.beamPose(this.beamUp,lead):this.beam;
+          target=this.beam;
         }else{
           const phase=(t-timing.lightEnd)/(timing.end-timing.lightEnd);
           target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
@@ -414,7 +414,8 @@ export class HeroAnimation {
       }
     }else if(palm){
       const poses=this.neutral.map(copyPose);
-      poses[1]=state(v(-.26,.18,-1),v(-.22,.12,-1),v(0,0,1),'shield');
+      const index=this.palmSide==='left'?0:1,sign=index?1:-1;
+      poses[index]=state(v(-sign*.26,.18,-1),v(-sign*.22,.12,-1),v(0,0,1),'shield');
       target=poses.map((pose,i)=>palm.age<.18?blend(this.entry[i],pose,palm.age/.18):blend(pose,this.neutral[i],(palm.age-.36)/.36));
     }else if(disc){
       const t=disc.age,timing=discTiming(disc),held=this.discPose(false,this.discSide),released=this.discPose(true,this.discSide),index=this.discSide==='left'?0:1;
@@ -443,7 +444,7 @@ export class HeroAnimation {
 
   updateSockets(){
     const rig=this.rigs[1],right=rig.metrics();
-    this.sockets.palm.copy(right.wrist).add(v(0,0,-.14));
+    this.sockets.palm.copy(this.rigs[this.palmSide==='left'?0:1].metrics().wrist).add(v(0,0,-.14));
     this.sockets.beam.copy(right.elbow).lerp(right.wrist,.73).add(v(0,0,-.18));
     const index=this.discSide==='left'?0:1,discRig=this.rigs[index];
     const tip=discRig.nodes['Mid3_'+discRig.side].localToWorld(discRig.tipLocal.Mid.clone());
