@@ -1,5 +1,19 @@
 # 阿里99与国内静态资源加速
 
+## 当前上线路线：境外 Pages
+
+2026-11-09 核实阿里99区域为杭州（cn-hangzhou），用户确认 emssion.com 未备案，并选择先使用免 ICP 备案的境外托管、在国内测速后再选择 CDN。因此当前不在杭州服务器安装 Runner 或开放公网游戏站点，下面的阿里99部署配置保留为备案后的备选，发布开关保持关闭。
+
+EdgeOne Pages/Makers 选择“全球（不含中国大陆）”。优先使用 Git 集成导入私有仓库 `adoin/IAmUltraman`，生产分支 `main`，根目录 `/`。仓库 `edgeone.json` 已设置安装 `npm ci`、构建 `npm test && npm run build`、产物目录 `dist`，并允许页面摄像头权限。导入完成后每次 main 推送将自动测试、构建并发布，无需服务器 Runner 或在仓库保存个人 SSH 私钥。
+
+自定义域名建议 `ultraman.emssion.com`，具体 DNS CNAME 值必须以项目控制台生成值为准；不得复用其他项目的 CNAME 或覆盖根域名既有站点。默认平台域名在大陆访问存在预览链接有效期限制，不能用其替代正式自定义域名。
+
+国内测速使用阿里99杭州服务器的 SSH 会话执行，不能使用用户本机（存在境外代理/分流）推断国内速度。至少分别测首页、雷德王 GLB 和识别 WASM，记录 HTTP 状态、首字节时间、总时间及下载字节数，冷/热请求均需检查。单个杭州机房结果不代表所有省份和运营商。
+
+2026-11-09 GitHub Pages 基线：杭州服务器请求首页约 1.23 秒；雷德王 25 秒仅收到 562286 字节（约 22 KB/s），识别 WASM 25 秒仅收到 507904 字节（约 20 KB/s），两个大资源均超时。这是实测时点的单个机房结果。
+
+参考：[境外域名和区域要求](https://pages.edgeone.ai/document/domain-overview)、[Git 构建配置](https://pages.edgeone.ai/document/edgeone-json)。
+
 ## 发布结构
 
 现有 Caddy 承载游戏 HTTPS 页面；无需额外游戏后端或数据库。源站保留模型、MediaPipe WASM、识别模型和配音，通过 CDN 回源缓存。CDN 不是另外一份需手工同步的素材仓库。
