@@ -1,4 +1,4 @@
-﻿// Dwell times (ms) live here so the tests can prove a stronger pose costs more.
+// Dwell times (ms) live here so the tests can prove a stronger pose costs more.
 export const POSE_HOLDS = Object.freeze({beamEasy:420,beamNormal:600,zepellionEasy:700,zepellionNormal:950,gatherEasy:260,gatherNormal:340,gatherWindow:4500,spreadEasy:260,spreadNormal:340,spreadWindow:3000});
 const length = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
@@ -44,7 +44,7 @@ export class GestureRecognizer {
     return straight&&aimed&&pushed&&spare;
   }
   update(points,time,width=640,height=480){
-    const out={skill:null,skillSide:null,discPreparation:null,punch:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；胸前十字＝梅特里姆光线，手臂摆成 L＝哉佩利敖光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,zepellionStage:0,debug:{}};
+    const out={skill:null,skillSide:null,discPreparation:null,punch:null,chargingSkill:null,charge:0,guard:false,lean:0,status:'收拳再向前推出可普攻；胸前十字＝梅特里姆光线，手臂摆成 L＝哉佩利敖光线，举手挥出光轮；胸前 X 交叉防御',tracking:false,zepellionStage:0,debug:{}};
     if(!points || this.lastTime!==null && (time<this.lastTime || time-this.lastTime>900)) this.reset();
     this.lastTime=time;
     if(!points) return this.lost(out);
@@ -98,12 +98,12 @@ export class GestureRecognizer {
       this.palmLast=time;
       this.raise=[null,null];this.armed=[null,null];
       palmInfo={side:palmArm.side,forward:+((palmArm.s.z-palmArm.w.z)/scale).toFixed(2),reach:+(length(palmArm.s,palmArm.w)/scale).toFixed(2),angle:Math.round(palmArm.angle)};
-      out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='单掌向前推出，保持一下…';
+      out.chargingSkill='palm';out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='单掌向前推出，保持一下…';
       if(time-this.palmSince>=palmHold&&!this.palmFired){out.skill='palm';out.skillSide=palmArm.side;out.status='手掌光剑！收回手臂再来一次';this.palmFired=true;this.punchReady=[null,null];return out;}
     }else if(this.palmSince!==null&&time-(this.palmLast??time)<=240){
       // A child's camera frame flickers. Keep the charge through short dropouts
       // instead of restarting the whole dwell on one noisy frame.
-      out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='保持前推，别松手…';
+      out.chargingSkill='palm';out.charge=clamp((time-this.palmSince)/palmHold,0,1);out.status='保持前推，别松手…';
     }else{this.palmSince=null;this.palmSide=null;this.palmFired=false;}
     const hold=easy?POSE_HOLDS.beamEasy:POSE_HOLDS.beamNormal;
     // Stage 1 of the Zepellion pre-motion: both palms drawn together in front of
@@ -113,7 +113,7 @@ export class GestureRecognizer {
     const centered=Math.abs((lw.x+rw.x)/2-(ls.x+rs.x)/2)/scale<(easy?.4:.3);
     const gatherPose=!guardPose&&!oneEach&&!palmArm&&clasp&&centered&&chest&&Math.abs(lw.z-rw.z)/scale<(easy?.35:.25);
     const gatherHold=easy?POSE_HOLDS.gatherEasy:POSE_HOLDS.gatherNormal;
-    if(gatherPose){
+    if(gatherPose){out.chargingSkill='zepellion';
       this.gatherSince??=time;
       if(time-this.gatherSince>=gatherHold)this.gatherAt=time;
       out.status=this.gatherAt!==null?'聚气完成！双臂向两侧展开':'双手在胸前合拢，聚气…';
@@ -121,7 +121,7 @@ export class GestureRecognizer {
     }else this.gatherSince=null;
     const gathered=this.gatherAt!==null&&time-this.gatherAt<=POSE_HOLDS.gatherWindow;
     const spreadPose=gathered&&spreadShape&&extended.every(angle=>angle>(easy?140:155));
-    if(spreadPose){
+    if(spreadPose){out.chargingSkill='zepellion';
       this.spreadSince??=time;
       if(time-this.spreadSince>=(easy?POSE_HOLDS.spreadEasy:POSE_HOLDS.spreadNormal))this.spreadAt=time;
       out.status=this.spreadAt!==null?'展开完成！摆好发射姿势':'双臂向两侧拉开，保持一下…';
@@ -131,7 +131,7 @@ export class GestureRecognizer {
     out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,l:zepellionPose,gather:gathered,spread:spreadReady,stage:out.zepellionStage,armed:this.armed.some(Boolean)};
     if(palmInfo)out.debug.palm=palmInfo;
     const finisherPose=zepellionPose||(cross&&(spreadReady||this.lFired));
-    if(finisherPose&&!guardPose){
+    if(finisherPose&&!guardPose){out.chargingSkill='zepellion';
       if(spreadReady)this.lSince??=time;else this.lSince=null;
       const lHold=easy?POSE_HOLDS.zepellionEasy:POSE_HOLDS.zepellionNormal;
       out.charge=this.lSince===null?0:clamp((time-this.lSince)/lHold,0,1);
@@ -140,7 +140,7 @@ export class GestureRecognizer {
       if(this.lFired)out.status='哉佩利敖光线！放下双手，再来一次';
     }else{this.lSince=null;this.lFired=false;}
     if(cross&&!finisherPose&&!guardPose){
-      this.crossSince??=time;
+      out.chargingSkill='beam';this.crossSince??=time;
       out.charge=clamp((time-this.crossSince)/hold,0,1);out.status='保持十字姿势，凝聚光线…';
       if(out.charge>=1&&!this.crossFired){out.skill='beam';this.crossFired=true;this.raise=[null,null];this.armed=[null,null];}
       if(this.crossFired)out.status='光线发射！放下双手，再来一次';
@@ -166,7 +166,7 @@ export class GestureRecognizer {
         if(progress>=1)this.armed[side]={relative,time};
       }else this.raise[side]=null;
     }
-    if(gatherPose){this.detectPunch(p,time,scale,out,true);return out;}
+    if(gatherPose){out.chargingSkill='zepellion';this.detectPunch(p,time,scale,out,true);return out;}
     if(cross||zepellionPose||spreadPose||guardPose||out.skill||this.armed.some(Boolean)||this.raise.some(v=>v!==null)){this.punchReady=[null,null];return out;}
     this.detectPunch(p,time,scale,out);
     return out;

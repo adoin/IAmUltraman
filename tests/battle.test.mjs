@@ -24,7 +24,15 @@ test('the last victory plays a timed celebration before the results panel',()=>{
 test('enemy windup warns without deducting energy; damage occurs on impact',()=>{const{scene:s,events}=battle();s.beginAttack('bolt');advance(s,ATTACKS.bolt.windup+.05);assert.equal(s.heroHealth,100);assert.ok(events.some(e=>e.type==='telegraph'));assert.ok(events.some(e=>e.type==='enemy-cast'));advance(s,ATTACKS.bolt.flight+.05);assert.equal(s.heroHealth,86);});
 test('raising the shield on the incoming strike blocks each monster attack',()=>{for(const kind of Object.keys(ATTACKS)){const{scene:s}=battle();if(kind==='charge')s.wave=3;s.beginAttack(kind);const{windup,flight}=s.attack;advance(s,windup+.1);s.setDefense(true);advance(s,flight+.1);assert.equal(s.heroHealth,100,kind);assert.equal(s.stats.blocked,1,kind);assert.equal(s.stars,1);assert.ok(s.guardEnergy<100);}});
 test('side step dodges aimed projectiles and charge; standing in place does not',()=>{for(const kind of ['bolt','charge']){const{scene:s}=battle();if(kind==='charge')s.wave=3;s.beginAttack(kind);s.setDefense(false,1);advance(s,s.attack.windup+s.attack.flight+.1);assert.equal(s.stats.dodged,1);assert.equal(s.heroHealth,100);}});
-test('sweep requires advertised safe side, while shockwave requires shield',()=>{const{scene:s}=battle();s.beginAttack('sweep');s.setDefense(false,s.attack.safeSide);advance(s,ATTACKS.sweep.windup+ATTACKS.sweep.flight+.1);assert.equal(s.stats.dodged,1);s.setDefense(false,1);impact(s,'slam');assert.equal(s.heroHealth,80);});
+test('wide sweeps and shockwaves hit either sidestep and can still be shielded',()=>{
+  for(let wave=1;wave<=WAVES.length;wave++)for(const kind of ['sweep','slam'])for(const lean of [-1,1]){
+    const{scene:s}=battle();s.wave=wave;s.nextAttack=100;s.beginAttack(kind);s.setDefense(false,lean);advance(s,s.attack.windup+s.attack.flight+.1);
+    assert.equal(s.heroHealth,100-ATTACKS[kind].damage,`${wave}/${kind}/${lean}`);assert.equal(s.stats.dodged,0);assert.equal(s.stars,0);
+    const{scene:b}=battle();b.wave=wave;b.nextAttack=100;b.beginAttack(kind);advance(b,b.attack.windup+.1);b.setDefense(true,lean);advance(b,b.attack.flight+.1);assert.equal(b.heroHealth,100);assert.equal(b.stats.blocked,1);
+  }
+});
+test('cross beam cannot be recast before its 9.5 second cooldown',()=>{const{scene:s}=battle();s.nextAttack=100;assert.equal(s.cast('beam'),true);s.effects=[];s.time=9.49;assert.equal(s.cast('beam'),false);s.time=9.5;assert.equal(s.cast('beam'),true);});
+test('every monster mixes a shield-required heavy attack into its close-range pattern',()=>{for(let wave=1;wave<=WAVES.length;wave++){const{scene:s}=battle();s.wave=wave;s.enemyDistance=16;const pattern=[];for(let index=0;index<6;index++){s.attackIndex=index;pattern.push(s.chooseAttack());}assert.equal(pattern[0],'melee');assert.equal(pattern[1],'melee');assert.equal(ATTACKS[pattern[2]].defense,'guard',s.waveInfo.model);assert.equal(ATTACKS[pattern[5]].defense,'guard',s.waveInfo.model);}});
 test('depleted shield cannot grant free invulnerability',()=>{const{scene:s}=battle();s.guardEnergy=1;s.setDefense(true);impact(s,'slam');assert.equal(s.heroHealth,80);assert.equal(s.stats.blocked,0);});
 test('powerful light beam interrupts windup and cancels incoming attack',()=>{const{scene:s,events}=battle();s.beginAttack('slam');s.cast('beam');advance(s,.7);assert.equal(s.attack,null);assert.ok(events.some(e=>e.type==='interrupt'));assert.equal(s.monsterHealth,64);assert.equal(s.heroHealth,100);});
 test('practice preserves health; projectiles do not hurt their owner',()=>{const{scene:s}=battle();s.practice=true;for(const kind of Object.keys(ATTACKS))impact(s,kind);assert.equal(s.heroHealth,100);assert.equal(s.monsterHealth,110);});
@@ -64,11 +72,11 @@ test('the first wave visibly commits to approaching before the player can chain 
 test('a prepared left disc uses the short throw timeline, stores hand and cancels preview',()=>{const b=new BattleEngine();b.start();b.setDiscPreparation({side:'left',progress:1,armed:true});assert.equal(b.cast('disc','left'),true);const e=b.effects[0];assert.equal(e.prepared,true);assert.equal(e.side,'left');assert.equal(b.discGesture,null);b.update(.57);assert.equal(b.monsterHealth,110);b.update(.02);assert.equal(b.monsterHealth,79);});
 
 test('disc preparation is cleared by punching, pause input and melee entry',()=>{const b=new BattleEngine();b.start();const prep={side:'right',progress:1,armed:true};b.setDiscPreparation(prep);b.punch('left');assert.equal(b.discGesture,null);b.setDiscPreparation(prep);b.enemyDistance=16;b.update(.01);assert.equal(b.discGesture,null);b.enemyDistance=35;b.paused=true;b.setDiscPreparation(prep);assert.equal(b.discGesture,null);});
-test('zepellion is the strongest ray, with the longest cooldown beside the rebalanced disc',()=>{
+test('zepellion remains the strongest ray and cross beam has its requested longer cooldown',()=>{
   const{scene:s}=battle();s.nextAttack=100;
   assert.ok(SKILLS.zepellion.damage>SKILLS.beam.damage,'zepellion must out-damage the Mebium ray');
-  assert.ok(SKILLS.zepellion.cooldown>SKILLS.beam.cooldown);
-  assert.equal(SKILLS.beam.cooldown,6.5);assert.equal(SKILLS.zepellion.cooldown,9);assert.equal(SKILLS.disc.cooldown,2);
+  assert.equal(SKILLS.beam.cooldown,9.5);
+  assert.equal(SKILLS.beam.cooldown,9.5);assert.equal(SKILLS.zepellion.cooldown,9);assert.equal(SKILLS.disc.cooldown,2);
   assert.equal(SKILLS.palm.damage,14);
   const before=s.monsterHealth;
   assert.equal(s.cast('zepellion'),true);

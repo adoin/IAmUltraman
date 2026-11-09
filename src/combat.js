@@ -13,7 +13,7 @@ export const WAVES = [
   {name:'迦拉克隆',model:'galactron',title:'光之要塞',hp:440,color:0x7fe7ff,attacks:['sweep','bolt','slam','charge']},
   {name:'加坦杰厄',model:'gatanothor',title:'暗黑支配者',hp:560,color:0x9a8cff,attacks:['slam','sweep','bolt','charge']},
 ];
-export const SKILLS={palm:{cooldown:2.2,damage:14,impact:.34,duration:.72},beam:{cooldown:6.5,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},zepellion:{cooldown:9,damage:82,impact:ZEPELLION_TIMING.impact,duration:ZEPELLION_TIMING.end},disc:{cooldown:2,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
+export const SKILLS={palm:{cooldown:2.2,damage:14,impact:.34,duration:.72},beam:{cooldown:9.5,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},zepellion:{cooldown:9,damage:82,impact:ZEPELLION_TIMING.impact,duration:ZEPELLION_TIMING.end},disc:{cooldown:2,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
 export const PUNCH={cooldown:.28,damage:12,impact:.18,duration:.36};
 export const SHIELD=Object.freeze({duration:2,cooldown:4,drain:10,recharge:14,blockCost:12});
 /** The final monster defeat hands the screen to the victory dance before results. */
@@ -34,8 +34,8 @@ export const MONSTER_ATTACK_NAMES={
 export const ATTACKS={
   melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:.8,flight:.3},
   bolt:{name:'能量弹',hint:'向左右侧身躲开，或胸前交叉双臂防御',damage:14,windup:1.1,flight:.7},
-  slam:{name:'大地震波',hint:'胸前交叉双臂，展开光之护盾',damage:20,windup:1.5,flight:.8},
-  sweep:{name:'横扫光束',hint:'躲向发光区域，或交叉双臂防御',damage:17,windup:1.3,flight:.7},
+  slam:{name:'大地震波',hint:'震波覆盖两侧，交叉双臂用护盾格挡',defense:'guard',damage:20,windup:1.5,flight:.8},
+  sweep:{name:'横扫光束',hint:'光束扫过两侧，交叉双臂用护盾格挡',defense:'guard',damage:17,windup:1.3,flight:.7},
   charge:{name:'巨兽冲锋',hint:'向侧面闪避，或用护盾挡住',damage:22,windup:.9,flight:.75},
 };
 // Waiting, telegraphing and recovery are separate knobs: pressure should come
@@ -54,7 +54,7 @@ export class BattleEngine {
   entranceDelay(){return locomotionFor(this.waveInfo.model).startDelay;}
   attackDelay(){return Math.max(this.pacing.minRest,this.pacing.rest-(this.wave-1)*.1);}
   chooseAttack(){
-    if(this.inMelee)return 'melee';
+    if(this.inMelee){const heavy=this.waveInfo.attacks.find(kind=>ATTACKS[kind].defense==='guard');return heavy&&this.attackIndex%3===2?heavy:'melee';}
     // Telegraph early enough to close promptly, but never eat the earned
     // counter window while a player is pushing the monster back.
     const p=locomotionFor(this.waveInfo.model);const approachLead=p.prepare*(this.difficulty==='normal'?.8:1)+p.duration*.7;
@@ -127,7 +127,7 @@ export class BattleEngine {
     if(this.monsterHealth===0){this.lowerShield();this.defeated=true;this.attack=null;this.stars+=3+this.wave;this.respawn=3;this.heroHealth=Math.min(100,this.heroHealth+15);this.guardEnergy=Math.min(100,this.guardEnergy+30);this.onEvent({type:'defeat',wave:this.wave});}this.emit();}
   beginAttack(kind,{opening=false}={}){if(this.defeated||this.finished||this.attack)return;if(this.time<this.retreatUntil)return;const config=ATTACKS[kind],approach=kind==='charge'?locomotionFor(this.waveInfo.model):null;const fast=this.difficulty==='normal'?.8:1;this.attack={kind,approach,damage:approach?approach.damage:config.damage,name:approach?.label||MONSTER_ATTACK_NAMES[this.waveInfo.model]?.[kind]||config.name,phase:'windup',age:0,windup:(approach?approach.prepare:config.windup)*fast,flight:approach?approach.duration*(this.difficulty==='normal'?.9:1):config.flight,originLean:this.lean,safeSide:this.attackIndex%2?-1:1};this.onEvent({type:'telegraph',attack:{...this.attack},config:{...config,name:this.attack.name,hint:approach&&approach.mode!=='ram'?'怪兽正在接近，准备近身出拳':config.hint}});}
   resolveAttack(){const attack=this.attack;if(!attack)return;if(attack.approach&&attack.approach.mode!=='ram'){this.attack=null;this.nextAttack=attack.approach.recovery;this.onEvent({type:'approach-end',mode:attack.approach.mode});this.emit();return;}const config=ATTACKS[attack.kind];let outcome='hit';
-    const dodged=attack.kind==='sweep'?this.lean*attack.safeSide>.4:attack.kind!=='slam'&&Math.abs(this.lean-attack.originLean)>.48;
+    const dodged=config.defense!=='guard'&&Math.abs(this.lean-attack.originLean)>.48;
     if(dodged){outcome='dodge';this.stats.dodged++;this.combo++;this.stars++;}
     else if(this.guard&&this.guardEnergy>=SHIELD.blockCost){outcome='block';this.guardEnergy-=SHIELD.blockCost;if(this.guardEnergy<=SHIELD.blockCost)this.lowerShield();this.stats.blocked++;this.combo++;this.stars++;}
     else if(!this.practice){const damage=this.difficulty==='normal'?Math.round((attack.damage??config.damage)*1.2):(attack.damage??config.damage);this.heroHealth=Math.max(0,this.heroHealth-damage);this.stats.damageTaken+=damage;this.combo=0;}

@@ -9,7 +9,15 @@ http.createServer(async (req,res) => {
     let file = path.resolve(root, '.' + decodeURIComponent(url.pathname));
     if (file !== root && !file.startsWith(root + path.sep)) throw new Error('Invalid path');
     if ((await stat(file)).isDirectory()) file = path.join(file,'index.html');
-    const body = await readFile(file);
+    let body = await readFile(file);
+    // Local review only: enter a quiet practice scene without adding a product flow.
+    if(url.pathname==='/'&&url.searchParams.get('preview')==='skills')body=Buffer.from(body.toString().replace('</body>',`<script type="module">
+      import {battle} from '/src/main.js';
+      await battle.ready;
+      while(document.querySelector('#start-keyboard').disabled)await new Promise(r=>setTimeout(r,100));
+      await document.querySelector('#start-keyboard').onclick();
+      battle.practice=true; battle.nextAttack=100000;
+    </script></body>`));
     res.writeHead(200,{'Content-Type':types[path.extname(file)] || 'application/octet-stream','Cache-Control':'no-store'});
     res.end(body);
   } catch { res.writeHead(404); res.end('Not found'); }

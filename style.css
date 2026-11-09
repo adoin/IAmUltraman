@@ -19,7 +19,32 @@
 .skill-grid,.guide-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media(max-width:600px){.guide-grid{grid-template-columns:1fr}}
 
-/* During combat only the two health bars remain above the world. */
+/* Compact combat information stays at the edges of the world. */
+.combat-skills{position:fixed;left:max(24px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));display:flex;gap:3px;padding:8px 10px 7px;border:1px solid #d6edff24;border-radius:21px;background:rgba(6,18,30,.28);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);box-shadow:0 5px 24px #00000014;pointer-events:auto}
+body:not(.in-battle) .combat-skills{display:none}
+.combat-skill{--skill-color:#9be9ff;position:relative;width:58px;padding:0;border:0;background:none;color:var(--skill-color);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.combat-skill[data-skill=zepellion]{--skill-color:#d4b8ff}.combat-skill[data-skill=disc]{--skill-color:#ffe3a2}.combat-skill[data-skill=palm]{--skill-color:#a5f3d8}.combat-skill[data-skill=guard]{--skill-color:#b7d9ff;margin-left:7px}
+.combat-skill[data-skill=guard]:before{content:'';position:absolute;left:-6px;top:11px;height:33px;width:1px;background:#d6edff25}
+.combat-skill-disc{display:block;position:relative;width:56px;height:56px}
+.combat-skill-ring{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke-width:1.8;transform:rotate(-90deg)}
+.combat-skill-ring .ring-track{stroke:#dceaff20}.combat-skill-ring .ring-value{stroke:currentColor;stroke-dasharray:100;stroke-linecap:round;opacity:.5}
+.combat-skill-icon{position:absolute;left:15px;top:15px;width:26px;height:26px;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px #c5eaff30)}
+.combat-skill-time{position:absolute;inset:0;display:grid;place-items:center;color:#f2f7ff;font:500 18px/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;text-shadow:0 1px 5px #000}
+.combat-skill-label{display:block;padding-top:3px;font-size:10px;line-height:15px;letter-spacing:.04em;color:#e6f2ffba;white-space:nowrap}
+.combat-skill-lock{display:none;position:absolute;right:1px;bottom:3px;width:14px;height:16px;padding:2px;background:#15202de6;border-radius:4px;stroke:#dce7f3;stroke-width:1.4}
+.combat-skill[data-state=cooldown] .combat-skill-icon,.combat-skill[data-state=guarding] .combat-skill-icon{opacity:.16}
+.combat-skill[data-state=cooldown] .ring-value{opacity:.65}
+.combat-skill[data-state=locked] .combat-skill-icon,.combat-skill[data-state=busy] .combat-skill-icon{opacity:.3;filter:none}
+.combat-skill[data-state=locked] .combat-skill-lock{display:block}
+.combat-skill[data-state=empty] .combat-skill-icon{opacity:.25}
+.combat-skill[data-state=charging] .ring-value{stroke-width:3;opacity:1}.combat-skill[data-state=charging] .combat-skill-icon{filter:drop-shadow(0 0 5px currentColor)}
+.combat-skill[data-state=guarding]{--skill-color:#8ffff0}.combat-skill.is-active .ring-value{opacity:1;stroke-width:3}
+.combat-skill:focus-visible{outline:2px solid #e5fbff;outline-offset:3px;border-radius:15px}
+.combat-skill.needs-guard{--skill-color:#ffe6a6}.combat-skill.needs-guard .combat-skill-label{color:#ffe6a6;font-weight:700}.combat-skill.needs-guard .ring-track{stroke:#ffe6a6;stroke-width:2.5;opacity:.85}
+.combat-skill.skill-ready-pop .combat-skill-disc{animation:skill-ready .45s ease-out}
+@keyframes skill-ready{0%{filter:brightness(1.9) drop-shadow(0 0 7px #bcefff70)}100%{filter:brightness(1)}}
+@media(max-width:600px){.combat-skills{left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));gap:1px;padding:7px;border-radius:17px}.combat-skill{width:46px;min-height:62px}.combat-skill-disc{width:44px;height:44px}.combat-skill-icon{width:23px;height:23px;left:10.5px;top:10.5px}.combat-skill-label{font-size:9px;padding-top:2px}.combat-skill-time{font-size:16px}.combat-skill[data-skill=guard]{margin-left:6px}.combat-skill[data-skill=guard]:before{height:26px;top:9px}}
+@media(prefers-reduced-motion:reduce){.combat-skill.skill-ready-pop .combat-skill-disc{animation:none}}
 .in-battle .arena>.battle-hud:not(#game){display:flex!important;position:fixed;top:max(18px,env(safe-area-inset-top));left:4vw;right:4vw;gap:24px;z-index:3;align-items:flex-start}
 .in-battle .battle-hud .wave-badge,.in-battle .battle-hud .avatar,.in-battle .battle-hud small{display:none}
 .in-battle .hero-hud,.in-battle .monster-hud{width:min(32vw,290px);padding:10px 13px 12px;background:linear-gradient(110deg,#0b203bd9,#0b203b70);border:1px solid #c1e8ff22;border-radius:10px}
