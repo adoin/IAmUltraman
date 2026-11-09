@@ -1,5 +1,5 @@
 ﻿// Dwell times (ms) live here so the tests can prove a stronger pose costs more.
-export const POSE_HOLDS = Object.freeze({beamEasy:420,beamNormal:600,zepellionEasy:700,zepellionNormal:950,gatherEasy:260,gatherNormal:340,gatherWindow:2800});
+export const POSE_HOLDS = Object.freeze({beamEasy:420,beamNormal:600,zepellionEasy:700,zepellionNormal:950,gatherEasy:260,gatherNormal:340,gatherWindow:4500,spreadEasy:260,spreadNormal:340,spreadWindow:3000});
 const length = (a,b) => Math.hypot(a.x-b.x,a.y-b.y);
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 const visible = p => p && (p.visibility ?? 1) > .45 && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -22,7 +22,7 @@ export class GestureRecognizer {
   reset(){this.clearSkillHolds();this.previous=null;this.lastTime=null;this.center=null;this.guardSince=null;this.punchReady=[null,null];this.punchLast=[-Infinity,-Infinity];}
   // A defensive pose or missing arm interrupts every offensive dwell. Keep
   // this list in one place so adding a skill cannot leave stale charge behind.
-  clearSkillHolds(){this.palmSince=null;this.palmLast=null;this.palmSide=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.lSince=null;this.lFired=false;this.gatherSince=null;this.gatherAt=null;this.raise=[null,null];this.armed=[null,null];}
+  clearSkillHolds(){this.palmSince=null;this.palmLast=null;this.palmSide=null;this.palmFired=false;this.crossSince=null;this.crossFired=false;this.lSince=null;this.lFired=false;this.gatherSince=null;this.gatherAt=null;this.spreadSince=null;this.spreadAt=null;this.raise=[null,null];this.armed=[null,null];}
   /**
    * One arm pushed forward, the other resting at the waist. Depth alone is
    * noisy on cheap webcams, so a foreshortened straight arm (short 2D reach with
@@ -85,7 +85,11 @@ export class GestureRecognizer {
       {s:ls,e:le,w:lw,otherS:rs,otherE:re,otherW:rw,angle:extended[0],otherAngle:extended[1],side:'left'},
       {s:rs,e:re,w:rw,otherS:ls,otherE:le,otherW:lw,angle:extended[1],otherAngle:extended[0],side:'right'},
     ];
-    const palmArm=!this.armed.some(Boolean)&&!oneEach?arms.find(arm=>this.palmThrust(arm,scale,easy)):null;
+    const bodySign=Math.sign(rs.x-ls.x)||1;
+    const spreadShape=Math.abs(lw.x-rw.x)/scale>(easy?2.6:3)&&
+      (ls.x-lw.x)*bodySign>scale*.45&&(rw.x-rs.x)*bodySign>scale*.45&&
+      [lw,rw].every((w,i)=>Math.abs(w.y-[ls,rs][i].y)/scale<(easy?.5:.38));
+    const palmArm=!this.armed.some(Boolean)&&!oneEach&&!spreadShape?arms.find(arm=>this.palmThrust(arm,scale,easy)):null;
     const palmHold=easy?520:650;
     let palmInfo;
     if(palmArm){
@@ -107,33 +111,35 @@ export class GestureRecognizer {
     // the gather happened shortly before the L is complete.
     const clasp=length(lw,rw)/scale<(easy?.55:.42);
     const centered=Math.abs((lw.x+rw.x)/2-(ls.x+rs.x)/2)/scale<(easy?.4:.3);
-    const gatherPose=!guardPose&&!oneEach&&!palmArm&&clasp&&centered&&chest;
+    const gatherPose=!guardPose&&!oneEach&&!palmArm&&clasp&&centered&&chest&&Math.abs(lw.z-rw.z)/scale<(easy?.35:.25);
     const gatherHold=easy?POSE_HOLDS.gatherEasy:POSE_HOLDS.gatherNormal;
     if(gatherPose){
       this.gatherSince??=time;
       if(time-this.gatherSince>=gatherHold)this.gatherAt=time;
-      out.status=this.gatherAt!==null?'聚气完成！把两条小臂摆成 L 形':'双手在胸前合拢，聚气…';
+      out.status=this.gatherAt!==null?'聚气完成！双臂向两侧展开':'双手在胸前合拢，聚气…';
       if(this.gatherAt===null)out.charge=clamp((time-this.gatherSince)/gatherHold,0,1);
     }else this.gatherSince=null;
     const gathered=this.gatherAt!==null&&time-this.gatherAt<=POSE_HOLDS.gatherWindow;
-    out.zepellionStage=zepellionPose&&gathered?2:gathered?1:0;
-    out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,l:zepellionPose,gather:this.gatherAt!==null,stage:out.zepellionStage,armed:this.armed.some(Boolean)};
+    const spreadPose=gathered&&spreadShape&&extended.every(angle=>angle>(easy?140:155));
+    if(spreadPose){
+      this.spreadSince??=time;
+      if(time-this.spreadSince>=(easy?POSE_HOLDS.spreadEasy:POSE_HOLDS.spreadNormal))this.spreadAt=time;
+      out.status=this.spreadAt!==null?'展开完成！摆好发射姿势':'双臂向两侧拉开，保持一下…';
+    }else this.spreadSince=null;
+    const spreadReady=gathered&&this.spreadAt!==null&&time-this.spreadAt<=POSE_HOLDS.spreadWindow;
+    out.zepellionStage=spreadReady&&(zepellionPose||cross)?3:spreadPose||spreadReady?2:gathered?1:0;
+    out.debug={horizontal:Math.round(horizontal),vertical:Math.round(vertical),gap:+gap.toFixed(2),cross,l:zepellionPose,gather:gathered,spread:spreadReady,stage:out.zepellionStage,armed:this.armed.some(Boolean)};
     if(palmInfo)out.debug.palm=palmInfo;
-    if(zepellionPose&&!guardPose){
-      // Tiga's finish: both forearms meet in an L, the vertical one outside the
-      // horizontal one, so the arms never cross like the Mebium "+" pose.
-      if(gathered)this.lSince??=time;else this.lSince=null;
+    const finisherPose=zepellionPose||(cross&&(spreadReady||this.lFired));
+    if(finisherPose&&!guardPose){
+      if(spreadReady)this.lSince??=time;else this.lSince=null;
       const lHold=easy?POSE_HOLDS.zepellionEasy:POSE_HOLDS.zepellionNormal;
       out.charge=this.lSince===null?0:clamp((time-this.lSince)/lHold,0,1);
-      out.status=gathered?'L 形成形，凝聚哉佩利敖光线…':'先双手在胸前合拢聚气，再摆 L 形';
-      if(out.charge>=1&&!this.lFired){
-        if(gathered){
-          out.skill='zepellion';out.skillSide='right';this.lFired=true;this.gatherAt=null;this.raise=[null,null];this.armed=[null,null];
-        }else if(!gathered&&this.gatherAt===null)out.status='还差聚气：先双手在胸前合拢';
-      }
+      out.status=spreadReady?'发射姿势就绪，凝聚哉佩利敖光线…':gathered?'先将双臂向两侧展开，再定姿':'先双手合拢聚气，再展开双臂';
+      if(out.charge>=1&&!this.lFired&&spreadReady){out.skill='zepellion';out.skillSide='right';this.lFired=true;this.gatherAt=null;this.spreadAt=null;this.raise=[null,null];this.armed=[null,null];}
       if(this.lFired)out.status='哉佩利敖光线！放下双手，再来一次';
     }else{this.lSince=null;this.lFired=false;}
-    if(cross&&!guardPose){
+    if(cross&&!finisherPose&&!guardPose){
       this.crossSince??=time;
       out.charge=clamp((time-this.crossSince)/hold,0,1);out.status='保持十字姿势，凝聚光线…';
       if(out.charge>=1&&!this.crossFired){out.skill='beam';this.crossFired=true;this.raise=[null,null];this.armed=[null,null];}
@@ -160,11 +166,12 @@ export class GestureRecognizer {
         if(progress>=1)this.armed[side]={relative,time};
       }else this.raise[side]=null;
     }
-    if(cross||zepellionPose||gatherPose||guardPose||out.skill||this.armed.some(Boolean)||this.raise.some(v=>v!==null)){this.punchReady=[null,null];return out;}
+    if(gatherPose){this.detectPunch(p,time,scale,out,true);return out;}
+    if(cross||zepellionPose||spreadPose||guardPose||out.skill||this.armed.some(Boolean)||this.raise.some(v=>v!==null)){this.punchReady=[null,null];return out;}
     this.detectPunch(p,time,scale,out);
     return out;
   }
-  detectPunch(points,time,scale,out){
+  detectPunch(points,time,scale,out,primeOnly=false){
     const candidates=[];
     for(let side=0;side<2;side++){
       const [shoulder,elbow,wrist]=(side===0?[11,13,15]:[12,14,16]).map(i=>points[i]);
@@ -178,13 +185,14 @@ export class GestureRecognizer {
       }
       const ready=this.punchReady[side];if(!ready)continue;
       if(!chest||time-ready.time>850){this.punchReady[side]=null;continue;}
+      if(primeOnly)continue;
       const forward=ready.wrist.z-relative.z,lateral=Math.abs(relative.x-ready.wrist.x),travel=Math.hypot(relative.x-ready.wrist.x,relative.y-ready.wrist.y,relative.z-ready.wrist.z);
       const straight=angle>135&&angle-ready.angle>22;
       if(straight&&travel>.2&&(forward>.12||(travel>.4&&lateral<.6))&&time-this.punchLast[side]>260)candidates.push({side,score:forward+travel*.3});
     }
     if(!candidates.length)return;
     candidates.sort((a,b)=>b.score-a.score);const side=candidates[0].side;
-    out.punch=side===0?'left':'right';out.status=side===0?'左直拳！收拳后继续':'右直拳！收拳后继续';this.punchLast[side]=time;this.punchReady[side]=null;
+    this.gatherAt=null;this.spreadAt=null;out.zepellionStage=0;out.punch=side===0?'left':'right';out.status=side===0?'左直拳！收拳后继续':'右直拳！收拳后继续';this.punchLast[side]=time;this.punchReady[side]=null;
   }
   lost(out){this.clearSkillHolds();this.punchReady=[null,null];this.guardSince=null;out.status='让肩膀、手肘和双手完整入镜';return out;}
 }

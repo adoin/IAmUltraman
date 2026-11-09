@@ -228,16 +228,19 @@ export class HeroAnimation {
     this.beamBase=this.beamPose(worldUp,0);
     this.beam=this.beamPose(worldUp);
     this.gather=this.gatherPose();
-    // Zepellion's slow three-beat wind-up. Beat 1 pushes both arms straight
-    // forward, beat 2 drags the forearms wide (the "draw"), beat 3 snaps into
-    // the photonic cross held in beamBase.
-    // Both beats have to stay inside the first-person frustum: the mount sits
-    // ~0.2 units in front of the eye and each arm is ~2.25 long, so a fully
-    // lateral sweep would throw the hands off screen in the near plane. Beat 1
-    // pushes both palms forward until they nearly meet; beat 2 sweeps them wide
-    // (still forward) so the silhouette change reads as a horizontal draw.
+    // Reach stays forward. The next beat extends both elbows completely to
+    // the viewport sides, holds that span, then forms the firing cross.
     this.zepReach=[-1,1].map(sign=>state(v(sign*.08,-.14,-.99),v(-sign*.32,.06,-.94),v(0,1,0),'blade',v(-sign*.30,.05,-.95)));
-    this.zepPull=[-1,1].map(sign=>state(v(sign*.30,-.14,-.95),v(sign*.26,.22,-.94),v(0,1,0),'blade',v(sign*.24,.20,-.95)));
+    // Straight elbows, maximum visible span. Solve a shoulder-centred sphere
+    // against each viewport edge instead of stopping at a small forward V.
+    const tangent=Math.tan(THREE.MathUtils.degToRad(this.lens.camera.fov/2))*this.aspect;
+    this.zepPull=this.rigs.map((rig,index)=>{
+      const sign=index?1:-1,dx=sign*.94*tangent,s=rig.mount,length=rig.upperLength+rig.lowerLength;
+      const a=dx*dx+1,b=dx*s.x-s.z,c=s.x*s.x+s.z*s.z-length*length;
+      const depth=(b+Math.sqrt(Math.max(0,b*b-a*c)))/a;
+      const direction=v(dx*depth-s.x,0,-depth-s.z).normalize();
+      return state(direction.clone(),direction.clone(),v(0,1,0),'blade',direction);
+    });
   }
 
   beamPose(up,lead=1){
@@ -353,15 +356,21 @@ export class HeroAnimation {
     this.prepareLayout();
     this.action=null;this.recover=null;
     this.entry=null;
-    this.guard=0;this.discSide='right';this.palmSide='right';this.preparing=false;
+    this.guard=0;this.discSide='right';this.palmSide='right';this.preparing=false;this.zepPreview=0;
     this.current=this.neutral.map(copyPose);
     this.rigs.forEach((rig,index)=>{rig.restore();rig.apply(this.current[index]);});
     this.updateSockets();
   }
 
-  update({beam,disc,discPreparation,palm,punch,guard,dt}){
+  update({beam,disc,discPreparation,zepPreparation=0,palm,punch,guard,dt}){
     this.prepareLayout();
     const active=beam||disc||palm||punch;
+    const preview=!active&&!guard&&!discPreparation?zepPreparation:0;
+    if(preview!==this.zepPreview){
+      if(!preview&&this.zepPreview&&!active)this.recover={poses:this.current.map(copyPose),age:0};
+      this.zepPreview=preview;this.zepPreviewEntry=this.current.map(copyPose);this.zepPreviewAge=0;
+    }
+    if(preview)this.zepPreviewAge+=dt;
     if(active)this.guard=0;
     if(!active&&!discPreparation&&this.preparing)this.recover={poses:this.current.map(copyPose),age:0};
     const wasPreparing=this.preparing;this.preparing=!!discPreparation&&!active&&!guard;
@@ -389,10 +398,12 @@ export class HeroAnimation {
           target=[blend(this.entry[0],reach[0],phase),blend(this.entry[1],reach[1],phase*.92)];
         }else if(t<timing.pull){
           const phase=(t-timing.reach)/(timing.pull-timing.reach);
-          target=[blend(reach[0],pull[0],phase),blend(reach[1],pull[1],phase*.94)];
+          target=[blend(reach[0],pull[0],phase),blend(reach[1],pull[1],phase)];
+        }else if(t<timing.pullHold){
+          target=pull;
         }else if(t<timing.cross){
-          const phase=(t-timing.pull)/(timing.cross-timing.pull);
-          target=[blend(pull[0],cross[0],phase),blend(pull[1],cross[1],phase*.9)];
+          const phase=(t-timing.pullHold)/(timing.cross-timing.pullHold);
+          target=[blend(pull[0],cross[0],phase),blend(pull[1],cross[1],phase)];
         }else if(t<timing.lightEnd){
           target=this.beam;
         }else{
@@ -412,6 +423,10 @@ export class HeroAnimation {
           target=[blend(this.beam[0],this.neutral[0],phase/.85),blend(this.beam[1],this.neutral[1],(phase-.24)/.76)];
         }
       }
+    }else if(preview){
+      this.syncBeamPose();
+      const pose=preview===1?this.zepReach:preview===2?this.zepPull:this.beam;
+      target=pose.map((p,i)=>blend(this.zepPreviewEntry[i],p,this.zepPreviewAge/(preview===2?.22:.18)));
     }else if(palm){
       const poses=this.neutral.map(copyPose);
       const index=this.palmSide==='left'?0:1,sign=index?1:-1;
@@ -439,7 +454,7 @@ export class HeroAnimation {
     this.current=target;
     this.rigs.forEach((rig,index)=>rig.apply(target[index]));
     this.updateSockets();
-    return !!active||this.preparing||!!this.recover||this.guard>.01;
+    return !!active||!!preview||this.preparing||!!this.recover||this.guard>.01;
   }
 
   updateSockets(){

@@ -86,7 +86,8 @@ export class GameAudio {
     // The finisher's charge is scored against the same three-beat wind-up the
     // animation uses, so the sound lands on reach, pull, cross and fire.
     if(kind==='zepellion'){
-      const {reach,pull,cross,fire}=ZEPELLION_TIMING;
+      const {reach,pull,cross,fire}=timing||ZEPELLION_TIMING;
+      if(reach>0){
       this.note(180,.42,.18,'triangle',now,this.fxGain,330);
       this.noise(.4,.17,5200,now+.02);
       this.note(280,.55,.2,'sawtooth',now+reach-.06,this.fxGain,520);
@@ -94,6 +95,7 @@ export class GameAudio {
       this.note(520,.6,.22,'sawtooth',now+pull-.05,this.fxGain,1180);
       this.note(760,.5,.13,'sine',now+cross-.12,this.fxGain,1550);
       this.noise(.3,.15,7200,now+cross-.1);
+      }
       this.note(150,.9,.26,'sawtooth',now+fire,this.fxGain,620);
       this.noise(1.7,.44,8000,now+fire);
       this.note(210,1.6,.28,'triangle',now+fire+.05,this.fxGain,60);

@@ -1,0 +1,16 @@
+import{chromium}from'playwright';import assert from'node:assert/strict';import{mkdir}from'node:fs/promises';
+const out=process.env.BROWSER_ARTIFACT_DIR||'D:/tmp/ultraman-pressure-check';await mkdir(out,{recursive:true});
+const browser=await chromium.launch({...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{channel:'chrome'}),headless:true,args:['--mute-audio']});
+try{const page=await browser.newPage({viewport:{width:1000,height:720}}),errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(String(e)));await page.goto(process.env.GAME_URL||'http://127.0.0.1:4173',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('#load-status').textContent==='海湾准备就绪');
+const act=code=>page.evaluate(async code=>{const{battle:b}=await import(document.querySelector('script[type=module]').src),T=await import('three');return new Function('b','T',code)(b,T);},code);
+const step=dt=>act(`for(let t=0;t<${dt}-1e-8;t+=1/120)b.advance(Math.min(1/120,${dt}-t));b.renderer.render(b.renderScene,b.camera);`);
+const snap=async file=>{await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await page.screenshot({path:out+'/'+file+'.png'});};
+await act('b.renderer.setAnimationLoop(null);b.setQuality("low");return b.prefetch;');await page.locator('#start-keyboard').click();await page.waitForFunction(()=>document.body.classList.contains('in-battle'));
+for(const [wave,name]of [[2,'baltan'],[10,'galactron']]){
+ await act(`b.start();b.wave=${wave};b.selectMonster();b.monsterMax=b.monsterHealth=b.waveInfo.hp;b.emit();b.nextAttack=100;b.advance(.01);b.beginAttack('bolt');while(b.attack.phase==='windup')b.advance(1/120);`);
+ await step(.18);const early=await act('return b.monsterMotion.rig.hand.L.getWorldPosition(new T.Vector3()).toArray();');assert.equal(await act('return b.heroHealth'),100);await snap(name+'-fast-release');await step(.3);const later=await act('return b.monsterMotion.rig.hand.L.getWorldPosition(new T.Vector3()).toArray();');const drift=Math.hypot(...early.map((v,i)=>v-later[i]));assert.ok(drift<.2,'the firing arm must finish at release, not stretch slowly through the projectile flight: '+drift);console.log('PASS',name,'fast hand strike at projectile release',drift);
+}
+await act('b.start();b.wave=2;b.selectMonster();b.monsterMax=b.monsterHealth=b.waveInfo.hp;b.emit();b.nextAttack=b.entranceDelay();b.cast("zepellion");');await step(3.05);
+assert.equal(await act('return b.inMelee'),true);assert.equal(await act('return b.effects.some(e=>e.kind!=="punch")'),false);assert.equal(await act('return b.cast("disc")'),false);assert.ok(await act('return b.monsterHealth')>0);assert.ok(await act('return Math.abs(b.currentMonster.position.z-(20-b.enemyDistance))')<.5);await snap('charge-interrupts-ray');console.log('PASS monster visibly reaches melee alive and interrupts remote chaining');
+for(const side of ['left','right','left']){assert.equal(await act(`return b.punch('${side}');`),true);await step(.4);}await step(.55);assert.equal(await act('return b.inMelee'),false);assert.equal(await act('return b.cast("beam")'),true);await step(.5);await snap('earned-ranged-window');console.log('PASS three punches earn a ranged counter window');assert.deepEqual(errors,[]);
+}finally{await browser.close();}

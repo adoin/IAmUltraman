@@ -16,14 +16,15 @@ const base = process.env.GAME_URL || 'http://127.0.0.1:4173';
 const out = process.env.BROWSER_ARTIFACT_DIR || 'D:/tmp/ultraman-zepellion-check';
 mkdirSync(out, {recursive: true});
 const DIFFERENCE = 0.12; // world units between the two hand rigs' poses
-const {reach, pull, cross, fire, lightEnd, end} = ZEPELLION_TIMING;
+const {reach,pull,pullHold,cross,fire,lightEnd,end} = ZEPELLION_TIMING;
 
 // The wind-up is only a three-beat motion if the beats are ordered and spaced.
 assert.ok(reach < pull && pull < cross && cross <= fire, 'reach -> pull -> cross -> fire must be ordered');
-assert.ok(pull - reach >= 0.4 && cross - pull >= 0.4, 'each wind-up beat needs its own time');
+assert.ok(pull-reach<=.3&&pullHold-pull>=.3&&cross>pullHold,'the quick pull must reach full extension and hold before crossing');
 assert.ok(lightEnd > fire && end > lightEnd, 'the light must outlast the shot');
 
-const browser = await chromium.launch({...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{channel:'chrome'}),headless:true});
+const browser = await chromium.launch({...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{channel:'chrome'}),headless:true,args:['--mute-audio']});
+try {
 const page = await browser.newPage({viewport: {width: 640, height: 420}});
 const errors = [];
 page.on('pageerror', (error) => errors.push(String(error)));
@@ -88,10 +89,31 @@ assert.ok(pullVsCross >= DIFFERENCE * 0.6, `the cross must snap out of the pull 
 const settled=distance(zepCross,flat([zep[3]])[0]);
 assert.ok(settled<.03,`the final firing pose must be complete before emission (${settled.toFixed(3)})`);
 
+// Maximum extension and a real hold, checked against the deformed bones.
+for(const [label,viewport]of [['desktop',{width:1280,height:900}],['portrait',{width:390,height:844}]]){
+ await page.setViewportSize(viewport);
+ const measure=async age=>page.evaluate(age=>{
+   const b=window.__b,T=window.__T;b.resize();window.__castThenSample('zepellion',[age]);
+   b.renderScene.updateMatrixWorld(true);
+   return b.hero.rigs.map(r=>{const m=r.metrics(),upper=m.elbow.clone().sub(m.shoulder).normalize(),fore=m.wrist.clone().sub(m.elbow).normalize(),screen=r.hand.getWorldPosition(new T.Vector3()).project(b.hero.lens.camera);return{straight:upper.dot(fore),x:screen.x,wrist:m.wrist.toArray()};});
+ },age);
+ const full=await measure(pull+.04),held=await measure(pullHold-.04);
+ for(let j=0;j<2;j++){assert.ok(full[j].straight>.995,'both elbows must extend completely');assert.ok(Math.abs(full[j].x)>.9,'both hands must reach the viewport sides');assert.ok(Math.hypot(...full[j].wrist.map((v,k)=>v-held[j].wrist[k]))<.01,'the full pull must hold before the cross');}
+ await page.evaluate(()=>document.getElementById('pose-label')?.remove());
+ await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+ await page.screenshot({path:join(out,label+'-full-spread.png')});
+ console.log('PASS',label,'straight arms, full screen span and held extension',full);
+}
+await page.setViewportSize({width:640,height:420});
+await page.evaluate(()=>{const b=window.__b;b.resize();b.start();b.nextAttack=1e9;b.setPoseStage(1);b.advance(.2);b.setPoseStage(2);b.advance(.3);b.renderer.render(b.renderScene,b.camera);});
+await page.screenshot({path:join(out,'camera-spread-preview.png')});
+const prepared=await page.evaluate(()=>{const b=window.__b;b.setPoseStage(3);b.advance(.8);b.cast('zepellion');const data={prepared:b.effects[0].prepared,fire:b.effects[0].timing.fire};b.advance(.4);return{...data,health:b.monsterHealth};});
+assert.equal(prepared.prepared,true);assert.equal(prepared.fire,.12);assert.equal(prepared.health,28);console.log('PASS camera preparation is shown live and fires without repeating its wind-up');
+
 // The HUD has to show the pre-motion stages without a camera.
-await page.evaluate(()=>{window.__b.effects=[];window.__b.lastCast.zepellion=-100;});
+await page.evaluate(()=>{window.__b.effects=[];window.__b.lastCast.zepellion=-100;window.__b.nextAttack=1e9;});
 const hud = [];
-for (const stage of [1, 2, 0]) {
+for (const stage of [1,2,3,0]) {
   await page.evaluate((value) => {
     window.__b.setPoseStage(value);
     window.__b.renderer.render(window.__b.renderScene, window.__b.camera);
@@ -100,8 +122,9 @@ for (const stage of [1, 2, 0]) {
   hud.push({stage, text: (await page.locator('#zepellion-status').innerText()).trim()});
 }
 assert.match(hud[0].text, /聚气/, `stage 1 HUD text was "${hud[0].text}"`);
-assert.match(hud[1].text, /L\s*形/, `stage 2 HUD text was "${hud[1].text}"`);
-assert.match(hud[2].text, /就绪|冷却/, `stage 0 HUD text was "${hud[2].text}"`);
+assert.match(hud[1].text, /展开/, `stage 2 HUD text was "${hud[1].text}"`);
+assert.match(hud[2].text,/定姿/);
+assert.match(hud[3].text, /就绪|冷却/, `stage 0 HUD text was "${hud[2].text}"`);
 assert.deepEqual(errors, [], 'no page errors while casting');
 
 console.log(JSON.stringify({
@@ -112,4 +135,4 @@ console.log(JSON.stringify({
   crossVsBeam: +crossVsBeam.toFixed(3),
   hud,
 }, null, 1));
-await browser.close();
+}finally{await browser.close();}

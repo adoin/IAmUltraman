@@ -3,7 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BattleEngine, SKILLS, CELEBRATION, WAVES} from './combat.js';
 import {MonsterMotion} from './monster-motion.js';
 import {HeroAnimation} from './hero-animation.js';
-import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming} from './action-timing.js';
+import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming,beamTimingFor} from './action-timing.js';
 import {BeamVolume} from './beam-effect.js';
 const clamp=THREE.MathUtils.clamp,mix=THREE.MathUtils.lerp;
 const hitColor=new THREE.Color(0xffe3c8);
@@ -251,7 +251,7 @@ export class BattleScene extends BattleEngine {
     this.camera.position.set(0,9,20);this.camera.rotation.set(0,0,0);this.camera.lookAt(0,6,-25);
   }
   /** Pose-recognition stage for the Zepellion pre-motion (0 none, 1 gathered, 2 L formed). */
-  setPoseStage(stage){this.zepellionStage=stage|0;}
+  setPoseStage(stage){super.setPoseStage(stage);}
   selectMonster(){
     if(!this.assetReady)return;
     const requested=this.waveInfo.model;
@@ -300,7 +300,7 @@ export class BattleScene extends BattleEngine {
     const group=new THREE.Group();this.renderScene.add(group);this.camera.updateMatrixWorld(true);
     const start=this.hero.socketWorld(kind),end=this.getHitPoint();
     const beamFamily=kind==='beam'||kind==='zepellion',ultra=kind==='zepellion';
-    const timing=kind==='disc'?discTiming(data):ultra?ZEPELLION_TIMING:kind==='beam'?BEAM_TIMING:null;
+    const timing=data.timing||(kind==='disc'?discTiming(data):beamFamily?beamTimingFor(kind,data.prepared):null);
     const entry={kind,group,side:data.side,prepared:data.prepared,timing,age:0,duration:beamFamily?timing.lightEnd:timing?.end??SKILLS[kind].duration,start,end};
     if(kind==='palm'){
       entry.orb=this.flare(start,0x89eaff,1.8,group,1);entry.core=this.flare(start,0xffffff,.55,group,1);
@@ -364,7 +364,7 @@ export class BattleScene extends BattleEngine {
   setQuality(quality){this.renderer.setPixelRatio(quality==='low'?1:Math.min(devicePixelRatio||1,1.65));this.renderer.shadowMap.enabled=quality!=='low';this.resize();}
   animateMonster(dt){
     const m=this.currentMonster;if(!m)return;const t=this.time,a=this.attack,winding=a?.phase==='windup'?clamp(a.age/a.windup,0,1):0,attack=a?.phase==='flight';
-    m.rotation.y=this.defeated?.18*Math.sin(t):Math.sin(t*.5)*.04;m.position.y=this.defeated?-Math.pow(1-clamp(this.respawn/3,0,1),2)*21:0;this.monsterBaseZ=mix(this.monsterBaseZ,20-this.enemyDistance,1-Math.exp(-dt*8));m.position.z=this.monsterBaseZ;m.position.x=0;if(a?.kind==='sweep'){const scan=a.phase==='flight'?clamp(a.age/a.flight,0,1):0,ready=a.phase==='windup'?clamp(a.age/a.windup,0,1):1;m.rotation.y+=Math.atan2(-a.safeSide*11*(1-scan),this.enemyDistance)*ready;}
+    m.rotation.y=this.defeated?.18*Math.sin(t):Math.sin(t*.5)*.04;m.position.y=this.defeated?-Math.pow(1-clamp(this.respawn/3,0,1),2)*21:0;this.monsterBaseZ=a?.kind==='charge'&&a.phase==='flight'?20-this.enemyDistance:mix(this.monsterBaseZ,20-this.enemyDistance,1-Math.exp(-dt*8));m.position.z=this.monsterBaseZ;m.position.x=0;if(a?.kind==='sweep'){const scan=a.phase==='flight'?clamp(a.age/a.flight,0,1):0,ready=a.phase==='windup'?clamp(a.age/a.windup,0,1):1;m.rotation.y+=Math.atan2(-a.safeSide*11*(1-scan),this.enemyDistance)*ready;}
     if(this.time-this.knockbackAt<1){const t=this.time-this.knockbackAt;m.position.y=this.airborne?Math.sin(t*Math.PI)*4:0;m.rotation.x=-Math.sin(t*Math.PI)*.24;}else m.rotation.x=0;
     if(a?.kind==='charge'&&!this.defeated&&this.time-this.knockbackAt>=1){const dip=a.phase==='windup'?clamp(a.age/a.windup,0,1):1;m.rotation.x=(FLOATERS.has(this.waveInfo.model)?.32:.16)*dip;m.position.y-=dip*.22;}
     if(FLOATERS.has(this.waveInfo.model)&&!this.defeated){m.position.y+=Math.sin(t*1.8)*.06;if(a?.kind==='melee')m.position.z+=Math.sin(clamp(a.age/(a.phase==='windup'?a.windup:a.flight),0,1)*Math.PI)*.8;}
@@ -414,7 +414,7 @@ export class BattleScene extends BattleEngine {
     const guard=!beam&&!disc&&!palm&&!punch&&this.guard&&this.guardEnergy>0?1:0;
     if(guard&&!this.guardWasActive)this.shieldIgnition=.55;this.guardWasActive=guard;this.shieldIgnition=Math.max(0,(this.shieldIgnition||0)-dt);this.guardAmount=mix(this.guardAmount,guard,factor);
     this.camera.position.x=this.renderLean*4.5;this.camera.position.y=9+(this.reduced?0:Math.sin(this.time*1.4)*.025+Math.sin(this.time*95)*this.hitFlash*.13);this.camera.rotation.z=this.reduced?0:-this.renderLean*.035;this.camera.rotation.y=-this.renderLean*.025;
-    if(this.hero)this.hands.visible=this.hero.update({beam,disc,discPreparation:this.discGesture,palm,punch,guard,dt});
+    if(this.hero)this.hands.visible=this.hero.update({beam,disc,discPreparation:this.discGesture,zepPreparation:this.zepellionStage,palm,punch,guard,dt});
     if(this.hero){this.discPreview.visible=!!this.discGesture&&!beam&&!disc&&!palm&&!punch&&!guard;if(this.discPreview.visible){this.discPreview.position.copy(this.hero.socketWorld('disc'));this.discPreview.scale.setScalar((.25+.75*this.discGesture.progress)*this.hero.lens.scale);this.discPreview.rotation.z=this.time*10;}}
     this.shield.material.uniforms.energy.value=this.guardAmount*.7+this.defenseFlash+this.shieldIgnition*.5;this.shield.material.uniforms.time.value=this.reduced?0:this.time;this.shieldGlow.material.opacity=this.guardAmount*.28+this.defenseFlash*.35+this.shieldIgnition*.65;this.shieldGlow.rotation.z=this.time*.1;
     this.hurt=Math.max(0,this.hurt-dt);this.defenseFlash=Math.max(0,this.defenseFlash-dt);this.hitFlash=Math.max(0,this.hitFlash-dt);this.impactVeil.material.opacity=this.hurt*.13;

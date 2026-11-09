@@ -1,4 +1,4 @@
-﻿import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming} from './action-timing.js';
+﻿import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming,beamTimingFor} from './action-timing.js';
 export const WAVES = [
   {name:'雷德王',model:'redking',title:'海湾入侵者',hp:110,color:0xffcb7a,attacks:['bolt','charge','slam']},
   {name:'巴尔坦星人',model:'baltan',title:'宇宙忍者',hp:210,color:0x68d9ff,attacks:['bolt','charge','sweep']},
@@ -8,8 +8,8 @@ export const WAVES = [
   {name:'卡欧斯 · 泰罗',model:'chaos-taro',title:'暗之王冠',hp:285,color:0xff9a7b,attacks:['sweep','bolt','charge']},
   {name:'卡欧斯 · 奥特曼',model:'chaos-ultraman',title:'光之逆影',hp:305,color:0xc7a6ff,attacks:['bolt','charge','sweep']},
   {name:'杰顿',model:'zetton',title:'宇宙恐龙',hp:400,color:0xff7a5c,attacks:['bolt','sweep','charge']},
-  {name:'机械哥莫拉',model:'gomora-mecha',title:'钢铁咆哮',hp:340,color:0xffb066,attacks:['sweep','slam','bolt']},
-  {name:'迦拉克隆',model:'galactron',title:'光之要塞',hp:440,color:0x7fe7ff,attacks:['sweep','bolt','slam']},
+  {name:'机械哥莫拉',model:'gomora-mecha',title:'钢铁咆哮',hp:340,color:0xffb066,attacks:['sweep','slam','bolt','charge']},
+  {name:'迦拉克隆',model:'galactron',title:'光之要塞',hp:440,color:0x7fe7ff,attacks:['sweep','bolt','slam','charge']},
   {name:'加坦杰厄',model:'gatanothor',title:'暗黑支配者',hp:560,color:0x9a8cff,attacks:['slam','sweep','bolt','charge']},
 ];
 export const SKILLS={palm:{cooldown:2.2,damage:14,impact:.34,duration:.72},beam:{cooldown:6.5,damage:46,impact:BEAM_TIMING.impact,duration:BEAM_TIMING.end},zepellion:{cooldown:9,damage:82,impact:ZEPELLION_TIMING.impact,duration:ZEPELLION_TIMING.end},disc:{cooldown:2,damage:31,impact:DISC_TIMING.impact,duration:DISC_TIMING.end}};
@@ -31,27 +31,36 @@ export const MONSTER_ATTACK_NAMES={
   gatanothor:{bolt:'怪光线',sweep:'触手横扫',slam:'触手砸击',melee:'大镰重击',charge:'黑暗突进'},
 };
 export const ATTACKS={
-  melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:1.0,flight:.3},
-  bolt:{name:'能量弹',hint:'向左右侧身躲开，或胸前交叉双臂防御',damage:14,windup:2.2,flight:1.15},
-  slam:{name:'大地震波',hint:'胸前交叉双臂，展开光之护盾',damage:20,windup:2.6,flight:1.25},
-  sweep:{name:'横扫光束',hint:'躲向发光区域，或交叉双臂防御',damage:17,windup:2.4,flight:1.1},
-  charge:{name:'巨兽冲锋',hint:'向侧面闪避，或用护盾挡住',damage:22,windup:2.7,flight:1.15},
+  melee:{name:'近身重拳',hint:'胸前交叉双臂防御，或侧身闪避',damage:12,windup:.8,flight:.3},
+  bolt:{name:'能量弹',hint:'向左右侧身躲开，或胸前交叉双臂防御',damage:14,windup:1.1,flight:.7},
+  slam:{name:'大地震波',hint:'胸前交叉双臂，展开光之护盾',damage:20,windup:1.5,flight:.8},
+  sweep:{name:'横扫光束',hint:'躲向发光区域，或交叉双臂防御',damage:17,windup:1.3,flight:.7},
+  charge:{name:'巨兽冲锋',hint:'向侧面闪避，或用护盾挡住',damage:22,windup:.9,flight:.75},
 };
 // Waiting, telegraphing and recovery are separate knobs: pressure should come
 // from less idle time, while children still see a readable incoming attack.
 export const PACING=Object.freeze({
-  easy:Object.freeze({opening:.8,entrance:1.2,rest:1.8,minRest:.9,interrupted:.85}),
+  easy:Object.freeze({opening:.7,entrance:1.2,rest:1.8,minRest:.9,interrupted:.85}),
   normal:Object.freeze({opening:.6,entrance:1,rest:1.45,minRest:.65,interrupted:.65}),
 });
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /** Deterministic combat simulation, independent of rendering and camera inference. */
 export class BattleEngine {
   constructor(onEvent=()=>{}){this.onEvent=onEvent;this.difficulty='easy';this.practice=false;this.reset();}
-  reset(){this.loading=false;this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,zepellion:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=this.entranceDelay();this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
+  reset(){this.loading=false;this.zepellionStage=0;this.rangedWindowUntil=0;this.rangedCursor=0;this.discGesture=null;this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.knockdowns=0;this.lastPunch=-100;this.time=0;this.wave=1;this.stars=0;this.heroHealth=100;this.guardEnergy=100;this.guard=false;this.guardHeld=false;this.guardQueued=false;this.guardUntil=0;this.guardReadyAt=0;this.lean=0;this.effects=[];this.lastCast={beam:-100,zepellion:-100,disc:-100,palm:-100};this.monsterMax=WAVES[0].hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.finished=false;this.celebrating=0;this.playing=false;this.paused=false;this.nextAttack=this.entranceDelay();this.attack=null;this.attackIndex=0;this.respawn=0;this.combo=0;this.stats={casts:0,hits:0,blocked:0,dodged:0,damageTaken:0};this.emit();}
   get waveInfo(){return WAVES[this.wave-1];}
   get pacing(){return PACING[this.difficulty]||PACING.easy;}
   entranceDelay(){return this.wave===1?this.pacing.opening:this.pacing.entrance;}
   attackDelay(){return Math.max(this.pacing.minRest,this.pacing.rest-(this.wave-1)*.1);}
+  chooseAttack(){
+    if(this.inMelee)return 'melee';
+    // Telegraph early enough to close promptly, but never eat the earned
+    // counter window while a player is pushing the monster back.
+    const approachLead=ATTACKS.charge.windup*(this.difficulty==='normal'?.8:1)+ATTACKS.charge.flight*.7;
+    if(this.time+approachLead>=this.rangedWindowUntil)return 'charge';
+    const ranged=this.waveInfo.attacks.filter(kind=>kind!=='charge');
+    return ranged[this.rangedCursor++%ranged.length]||'charge';
+  }
   start(){this.reset();this.playing=true;this.onEvent({type:'wave',wave:1,info:this.waveInfo});}
   emit(){this.onEvent({type:'state',wave:this.wave,stars:this.stars,hero:this.heroHealth,monster:this.monsterHealth/this.monsterMax*100,monsterHP:this.monsterHealth,monsterMax:this.monsterMax,dead:this.defeated,guard:this.guardEnergy,info:this.waveInfo});}
   get canAct(){return this.playing&&!this.paused&&!this.loading&&!this.defeated&&!this.finished;}
@@ -66,14 +75,14 @@ export class BattleEngine {
     if(this.defeated)return;
     if(this.time<this.retreatUntil){this.enemyDistance=Math.min(this.retreatTarget,this.enemyDistance+34*dt);return;}
     if(this.attack?.kind==='charge'&&this.attack.phase==='flight'){const progress=clamp((this.attack.age+dt)/this.attack.flight,0,1),eased=progress*progress*(3-2*progress);this.enemyDistance=(this.attack.startDistance??this.enemyDistance)*(1-eased)+16.5*eased;}
-    if(this.inMelee){this.discGesture=null;this.interruptRemote();}
+    if(this.inMelee){this.discGesture=null;this.zepellionStage=0;this.interruptRemote();}
   }
   get guardRemaining(){return this.guard?Math.max(0,this.guardUntil-this.time):0;}
   get guardCooldown(){return Math.max(0,this.guardReadyAt-this.time);}
   raiseShield(){
     if(!this.canAct||this.guard||this.guardCooldown>0)return false;
     if(this.guardEnergy<=SHIELD.blockCost||this.effects.length)return false;
-    this.guard=true;
+    this.zepellionStage=0;this.discGesture=null;this.guard=true;
     this.guardUntil=this.time+SHIELD.duration;
     return true;
   }
@@ -86,7 +95,7 @@ export class BattleEngine {
     this.lean=clamp(lean,-1,1);
     if(this.guardHeld===!!held)return;
     this.guardHeld=!!held;
-    if(this.guardHeld)this.raiseShield();else this.lowerShield();
+    if(this.guardHeld){const raised=this.raiseShield();this.guardQueued=!raised&&this.canAct&&this.guardCooldown===0&&this.guardEnergy>SHIELD.blockCost&&this.effects.length>0;}else{this.guardQueued=false;this.lowerShield();}
   }
   updateShield(dt){
     const previousEnergy=this.guardEnergy;
@@ -100,19 +109,20 @@ export class BattleEngine {
     this.guardEnergy=clamp(this.guardEnergy-activeTime*SHIELD.drain+(dt-activeTime)*SHIELD.recharge,0,100);
     if(Math.floor(previousEnergy/2)!==Math.floor(this.guardEnergy/2))this.emit();
   }
-  punch(side='right'){if(!this.canAct||this.effects.some(e=>SKILLS[e.kind])||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.discGesture=null;this.lowerShield();this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
+  punch(side='right'){if(!this.canAct||this.effects.some(e=>SKILLS[e.kind])||this.time-(this.lastPunch??-100)<PUNCH.cooldown)return false;this.lastPunch=this.time;this.discGesture=null;this.lowerShield();this.zepellionStage=0;this.stats.punches=(this.stats.punches||0)+1;this.effects.push({kind:'punch',side,age:0,duration:PUNCH.duration,hit:false});this.onEvent({type:'punch',side});return true;}
   setDiscPreparation(preparation){this.discGesture=this.canAct&&!this.guard&&!this.inMelee&&this.time-this.lastCast.disc>=SKILLS.disc.cooldown&&!this.effects.some(e=>SKILLS[e.kind])?preparation:null;}
-  cast(skill,side='right'){const config=SKILLS[skill];if(config&&this.inMelee&&this.canAct){this.onEvent({type:'remote-interrupted'});if(!this.attack)this.beginAttack('melee');return false;}if(!config||!this.canAct||this.effects.some(e=>SKILLS[e.kind]||(e.kind==='punch'&&e.age<PUNCH.impact))||this.time-this.lastCast[skill]<config.cooldown)return false;this.lowerShield();const prepared=skill==='disc'&&!!this.discGesture?.armed&&this.discGesture.side===side,timing=skill==='disc'?discTiming({prepared}):null;this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,side,prepared,age:0,duration:timing?.end??config.duration,impact:timing?.impact??config.impact,hit:false});this.discGesture=null;this.onEvent({type:'cast',skill,side,prepared,timing});return true;}
+  setPoseStage(stage){this.zepellionStage=this.canAct&&!this.guard&&!this.inMelee&&!this.discGesture&&!this.effects.some(e=>SKILLS[e.kind])?Math.max(0,Math.min(3,stage|0)):0;}
+  cast(skill,side='right'){const config=SKILLS[skill];if(config&&this.inMelee&&this.canAct){this.onEvent({type:'remote-interrupted'});if(!this.attack)this.beginAttack('melee');return false;}if(!config||!this.canAct||this.effects.some(e=>SKILLS[e.kind]||(e.kind==='punch'&&e.age<PUNCH.impact))||this.time-this.lastCast[skill]<config.cooldown)return false;this.lowerShield();const prepared=skill==='disc'?!!this.discGesture?.armed&&this.discGesture.side===side:skill==='zepellion'&&this.zepellionStage===3,timing=skill==='disc'?discTiming({prepared}):skill==='zepellion'?beamTimingFor(skill,prepared):null;this.lastCast[skill]=this.time;this.stats.casts++;this.effects.push({kind:skill,side,prepared,timing,age:0,duration:timing?.end??config.duration,impact:timing?.impact??config.impact,hit:false});this.discGesture=null;this.zepellionStage=0;this.onEvent({type:'cast',skill,side,prepared,timing});return true;}
   damage(amount,source='hit',side=null){if(this.defeated||this.finished)return;if(source==='punch'){
       if(!this.inMelee)return;
       this.meleeHits++;
       if(this.meleeHits>=3){
-        this.meleeHits=0;this.knockdowns++;this.retreatTarget=this.knockdowns%2===0?43:35;this.retreatUntil=this.time+1;this.attack=null;this.nextAttack=Math.max(1.2,this.attackDelay()-0.6);
+        this.meleeHits=0;this.knockdowns++;this.retreatTarget=this.knockdowns%2===0?43:35;this.retreatUntil=this.time+1;this.rangedWindowUntil=this.time+3.2;this.attack=null;this.nextAttack=Math.max(1.2,this.attackDelay()-0.6);
         this.onEvent({type:'knockback',airborne:this.knockdowns%2===0});
       }
     }
     this.monsterHealth=Math.max(0,this.monsterHealth-amount);this.stats.hits++;this.onEvent({type:'hit',amount,source,side});
-    if(this.attack&&this.attack.phase==='windup'&&amount>=40){this.attack=null;this.nextAttack=this.pacing.interrupted;this.onEvent({type:'interrupt'});}
+    if(this.attack&&this.attack.phase==='windup'&&this.attack.kind!=='charge'&&amount>=40){this.attack=null;this.nextAttack=this.pacing.interrupted;this.onEvent({type:'interrupt'});}
     if(this.monsterHealth===0){this.lowerShield();this.defeated=true;this.attack=null;this.stars+=3+this.wave;this.respawn=3;this.heroHealth=Math.min(100,this.heroHealth+15);this.guardEnergy=Math.min(100,this.guardEnergy+30);this.onEvent({type:'defeat',wave:this.wave});}this.emit();}
   beginAttack(kind,{opening=false}={}){if(this.defeated||this.finished||this.attack)return;if(this.time<this.retreatUntil)return;const config=ATTACKS[kind];const fast=this.difficulty==='normal'?.8:1;this.attack={kind,name:MONSTER_ATTACK_NAMES[this.waveInfo.model]?.[kind]||config.name,phase:'windup',age:0,windup:(opening&&this.wave===1?Math.min(config.windup,1):config.windup)*fast,flight:config.flight,originLean:this.lean,safeSide:this.attackIndex%2?-1:1};this.onEvent({type:'telegraph',attack:{...this.attack},config:{...config,name:this.attack.name}});}
   resolveAttack(){const attack=this.attack;if(!attack)return;const config=ATTACKS[attack.kind];let outcome='hit';
@@ -123,7 +133,7 @@ export class BattleEngine {
     else outcome='practice';
     this.onEvent({type:'defense',outcome,kind:attack.kind});
     if(outcome==='hit'&&!this.practice)this.onEvent({type:'attacked'});
-    this.attack=null;this.nextAttack=this.attackDelay();this.emit();
+    this.attack=null;this.nextAttack=this.inMelee?this.attackDelay():Math.min(this.pacing.interrupted,this.attackDelay());this.emit();
     if(this.heroHealth===0){this.finished=true;this.onEvent({type:'over',stars:this.stars,stats:{...this.stats}});}
   }
   update(dt){if(!this.playing||this.paused||this.loading||dt<=0)return;
@@ -136,8 +146,9 @@ export class BattleEngine {
     this.time+=dt;this.updateShield(dt);this.updateDistance(dt);
     for(const effect of this.effects){effect.age+=dt;const config=effect.kind==='punch'?PUNCH:SKILLS[effect.kind];if(config&&!effect.hit&&effect.age>=(effect.impact??config.impact)){effect.hit=true;this.damage(config.damage,effect.kind,effect.side);}}
     this.effects=this.effects.filter(e=>e.age<e.duration);
-    if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.celebrating=CELEBRATION.duration;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=this.entranceDelay();this.attackIndex=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
+    if(this.guardQueued&&this.guardHeld&&!this.effects.length){this.guardQueued=false;this.raiseShield();}
+    if(this.defeated){this.respawn-=dt;if(this.respawn<=0){if(this.wave===WAVES.length){this.finished=true;this.celebrating=CELEBRATION.duration;this.onEvent({type:'victory',stars:this.stars,stats:{...this.stats}});return;}this.enemyDistance=35;this.retreatTarget=35;this.retreatUntil=0;this.meleeHits=0;this.wave++;this.monsterMax=this.waveInfo.hp;this.monsterHealth=this.monsterMax;this.defeated=false;this.nextAttack=this.entranceDelay();this.attackIndex=0;this.rangedCursor=0;this.rangedWindowUntil=0;this.effects=[];this.onEvent({type:'wave',wave:this.wave,info:this.waveInfo});this.emit();}return;}
     if(this.attack){this.attack.age+=dt;if(this.attack.phase==='windup'&&this.attack.age>=this.attack.windup){this.attack.phase='flight';this.attack.age=0;this.attack.startDistance=this.enemyDistance;this.onEvent({type:'enemy-cast',attack:{...this.attack}});}else if(this.attack.phase==='flight'&&this.attack.age>=this.attack.flight)this.resolveAttack();}
-    else{this.nextAttack-=dt;if(this.nextAttack<=0){const attacks=this.waveInfo.attacks;const kind=this.inMelee?'melee':attacks[this.attackIndex%attacks.length];const opening=this.attackIndex===0;this.attackIndex++;this.beginAttack(kind,{opening});}}
+    else{this.nextAttack-=dt;if(this.nextAttack<=0){const kind=this.chooseAttack();const opening=this.attackIndex===0;this.attackIndex++;this.beginAttack(kind,{opening});}}
   }
 }

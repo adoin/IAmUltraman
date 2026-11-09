@@ -29,7 +29,7 @@ try {
     );
   };
   const data = [];
-  await act('b.renderer.setAnimationLoop(null);');
+  await act('b.renderer.setAnimationLoop(null);return b.prefetch;');
   for (const [wave, name, kinds] of [
     [1, 'redking', ['melee', 'bolt', 'slam', 'charge']],
     [2, 'baltan', ['melee', 'bolt', 'sweep', 'charge']],
@@ -37,7 +37,7 @@ try {
   ])
     for (const kind of kinds) {
       const base = await act(
-        `b.start();b.wave=${wave};b.selectMonster();b.nextAttack=100;b.enemyDistance=${kind === 'melee' ? 16.5 : 35};b.monsterBaseZ=20-b.enemyDistance;b.currentMonster.position.z=b.monsterBaseZ;b.advance(.01);b.beginAttack('${kind}');b.__armLengths=()=>['L','R'].flatMap(side=>{const m=b.monsterMotion,p=n=>m.node(n+'.'+side).getWorldPosition(new T.Vector3());return[p('upperarm').distanceTo(p('forearm')),p('forearm').distanceTo(p('hand'))];});return{windup:b.attack.windup,flight:b.attack.flight,damage:({melee:12,bolt:14,slam:20,sweep:17,charge:22})['${kind}'],lengths:'${name}'==='redking'?b.__armLengths():[]};`,
+        `b.start();b.wave=${wave};b.selectMonster();b.monsterMax=b.monsterHealth=b.waveInfo.hp;b.emit();b.nextAttack=100;b.enemyDistance=${kind === 'melee' ? 16.5 : 35};b.monsterBaseZ=20-b.enemyDistance;b.currentMonster.position.z=b.monsterBaseZ;b.advance(.01);b.beginAttack('${kind}');b.__armLengths=()=>['L','R'].flatMap(side=>{const m=b.monsterMotion,p=n=>m.node(n+'.'+side).getWorldPosition(new T.Vector3());return[p('upperarm').distanceTo(p('forearm')),p('forearm').distanceTo(p('hand'))];});return{windup:b.attack.windup,flight:b.attack.flight,damage:({melee:12,bolt:14,slam:20,sweep:17,charge:22})['${kind}'],lengths:'${name}'==='redking'?b.__armLengths():[]};`,
       );
       await advance(base.windup * 0.9);
       const gather = await act(
@@ -76,14 +76,10 @@ try {
       data.push({name, kind, gather, flight, contact});
       console.log('PASS', name, kind, 'windup, visible attack, contact and recovery');
     }
-  await act(
-    "b.start();b.nextAttack=100;b.enemyDistance=16.5;b.monsterBaseZ=3.5;b.currentMonster.position.z=3.5;b.beginAttack('bolt');",
-  );
-  await advance(2.3);
-  for (let i = 0; i < 3; i++) {
-    await act(`b.punch('${i % 2 ? 'right' : 'left'}');`);
-    await advance(0.4);
-  }
+  await act("b.start();b.nextAttack=100;b.enemyDistance=16.5;b.monsterBaseZ=3.5;b.currentMonster.position.z=3.5;b.meleeHits=2;b.beginAttack('bolt');");
+  await advance(1.15);
+  await act("b.punch('left');");
+  await advance(.4);
   assert.equal(
     await act("return b.visualEffects.some(e=>e.kind.startsWith('enemy-'))||b.chargeGroup.visible;"),
     false,

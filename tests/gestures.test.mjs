@@ -77,14 +77,16 @@ test('the L pose alone never fires the ray: the gather has to come first',()=>{
   assert.equal(fired,0,'an L without the gather must not fire');
   assert.deepEqual([...stages],[0]);
 });
-test('gather then L fires the Zepellion ray once and reports both stages',()=>{
+const spreadPose=poseFrom({11:[250,180],12:[390,180],13:[180,180],15:[100,180],14:[460,180],16:[540,180]});
+test('gather, full spread and L fire once and report all three stages',()=>{
   const r=new GestureRecognizer();const stages=[];let fired=0;
   for(let t=0;t<=400;t+=100){const out=r.update(gatherPose,t);stages.push(out.zepellionStage);}
   assert.ok(stages.includes(1),'gathering must report stage 1');
+  for(let t=500;t<=900;t+=100){const out=r.update(spreadPose,t);stages.push(out.zepellionStage);}
   let firedStage=null;
-  for(let t=500;t<=1800;t+=100){const out=r.update(lPose,t);stages.push(out.zepellionStage);if(out.skill==='zepellion'){fired++;firedStage=out.zepellionStage;}}
+  for(let t=1000;t<=2100;t+=100){const out=r.update(lPose,t);stages.push(out.zepellionStage);if(out.skill==='zepellion'){fired++;firedStage=out.zepellionStage;}}
   assert.equal(fired,1);
-  assert.equal(firedStage,2,'the ray fires from the formed L');
+  assert.equal(firedStage,3,'the ray fires only from the final L');
   assert.ok(stages.includes(2));
 });
 test('gathering and then flashing an L too briefly does not fire',()=>{
@@ -104,7 +106,8 @@ test('the Zepellion dwell is at least 1.5x the Mebium dwell and the ray needs mo
   assert.ok(ZEPELLION_TIMING.ready>=BEAM_TIMING.ready*1.5,'the Zepellion ready phase must be longer');
   assert.ok(ZEPELLION_TIMING.impact>=BEAM_TIMING.impact+.2,'contact must land later than the Mebium ray');
   assert.ok(ZEPELLION_TIMING.reach<ZEPELLION_TIMING.pull&&ZEPELLION_TIMING.pull<ZEPELLION_TIMING.cross&&ZEPELLION_TIMING.cross<=ZEPELLION_TIMING.fire,'the wind-up must read as reach -> pull -> cross before the shot');
-  assert.ok(ZEPELLION_TIMING.pull-ZEPELLION_TIMING.reach>=.4&&ZEPELLION_TIMING.cross-ZEPELLION_TIMING.pull>=.4,'every wind-up beat needs its own beat of time');
+  assert.ok(ZEPELLION_TIMING.pull-ZEPELLION_TIMING.reach<=.3,'the horizontal pull must finish quickly');
+  assert.ok(ZEPELLION_TIMING.pullHold-ZEPELLION_TIMING.pull>=.3,'the completed pull must visibly hold before crossing');
 });
 test('a waist-high spare hand with a forward arm is enough for the palm sword',()=>{
   const pose=coords=>{const p=Array.from({length:33},()=>({x:.5,y:.5,visibility:1}));for(const [i,[x,y]] of Object.entries(coords))p[i]={x:x/640,y:y/480,visibility:1};return p;};
@@ -119,8 +122,19 @@ test('a guard interrupts the beam dwell instead of storing charge across poses',
 
 test('lost wrists and complete tracking loss clear every gathered ray stage',()=>{for(const missing of [null,'wrist']){const r=new GestureRecognizer();for(let t=0;t<=400;t+=100)r.update(gatherPose,t);const hidden=structuredClone(gatherPose);hidden[15].visibility=0;r.update(missing===null?null:hidden,500);for(let t=600;t<=1600;t+=100)assert.notEqual(r.update(lPose,t).skill,'zepellion');}});
 
-test('holding the gather longer refreshes the window until the child forms an L',()=>{const r=new GestureRecognizer();for(let t=0;t<=5000;t+=100)r.update(gatherPose,t);let fired=0;for(let t=5100;t<=6100;t+=100)if(r.update(lPose,t).skill==='zepellion')fired++;assert.equal(fired,1);});
+test('holding the gather longer refreshes the window until the child forms an L',()=>{const r=new GestureRecognizer();for(let t=0;t<=5000;t+=100)r.update(gatherPose,t);for(let t=5100;t<=5500;t+=100)r.update(spreadPose,t);let fired=0;for(let t=5600;t<=6600;t+=100)if(r.update(lPose,t).skill==='zepellion')fired++;assert.equal(fired,1);});
 
-test('L forearms touching at an endpoint are not mistaken for a crossing beam',()=>{const r=new GestureRecognizer(),touch=structuredClone(lPose);touch[16].x=touch[13].x;touch[16].y=touch[13].y;for(let t=0;t<=400;t+=100)r.update(gatherPose,t);const fired=[];for(let t=500;t<=1500;t+=100){const out=r.update(touch,t);if(out.skill)fired.push(out.skill);}assert.deepEqual(fired,['zepellion']);});
+test('L forearms touching at an endpoint are not mistaken for a crossing beam',()=>{const r=new GestureRecognizer(),touch=structuredClone(lPose);touch[16].x=touch[13].x;touch[16].y=touch[13].y;for(let t=0;t<=400;t+=100)r.update(gatherPose,t);for(let t=500;t<=900;t+=100)r.update(spreadPose,t);const fired=[];for(let t=1000;t<=2000;t+=100){const out=r.update(touch,t);if(out.skill)fired.push(out.skill);}assert.deepEqual(fired,['zepellion']);});
 
 test('switching palm hands requires a new dwell and preserves the firing side',()=>{const r=new GestureRecognizer(),left=palmPush(),right=structuredClone(left);for(const [a,b]of [[11,12],[13,14],[15,16]])[right[a],right[b]]=[right[b],right[a]];r.update(left,0);r.update(left,300);r.update(right,350);assert.equal(r.update(right,600).skill,null);const out=r.update(right,900);assert.equal(out.skill,'palm');assert.equal(out.skillSide,'right');});
+
+test('gather and L cannot skip the fully spread stage',()=>{const r=new GestureRecognizer();for(let t=0;t<=400;t+=100)r.update(gatherPose,t);for(let t=500;t<=2000;t+=100)assert.notEqual(r.update(lPose,t).skill,'zepellion');});
+test('a small or crossed spread cannot arm the final ray',()=>{for(const crossArms of [false,true]){const r=new GestureRecognizer();for(let t=0;t<=400;t+=100)r.update(gatherPose,t);const bad=structuredClone(spreadPose);if(crossArms){for(const [a,b]of [[13,14],[15,16]])[bad[a],bad[b]]=[bad[b],bad[a]];}else{bad[15].x=220/640;bad[16].x=420/640;}for(let t=500;t<=1000;t+=100)r.update(bad,t);for(let t=1100;t<=2100;t+=100)assert.notEqual(r.update(lPose,t).skill,'zepellion');}});
+test('a mirrored full spread sequence preserves all three stages',()=>{const r=new GestureRecognizer(),mirror=p=>p.map(v=>({...v,x:1-v.x}));for(let t=0;t<=400;t+=100)r.update(mirror(gatherPose),t);for(let t=500;t<=900;t+=100)assert.equal(r.update(mirror(spreadPose),t).zepellionStage,2);let fired=0;for(let t=1000;t<=2000;t+=100)if(r.update(mirror(lPose),t).skill==='zepellion')fired++;assert.equal(fired,1);});
+test('losing a wrist after spreading cancels the whole preparation',()=>{const r=new GestureRecognizer();for(let t=0;t<=400;t+=100)r.update(gatherPose,t);for(let t=500;t<=900;t+=100)r.update(spreadPose,t);const hidden=structuredClone(spreadPose);hidden[15].visibility=0;r.update(hidden,950);for(let t=1000;t<=2000;t+=100)assert.notEqual(r.update(lPose,t).skill,'zepellion');});
+
+test('a relaxed full spread is not stolen by the one-handed palm detector',()=>{const r=new GestureRecognizer(),relaxed=structuredClone(spreadPose);relaxed[13].y=155/480;relaxed[14].y=155/480;for(let t=0;t<=400;t+=100)r.update(gatherPose,t);for(let t=500;t<=1500;t+=100)assert.equal(r.update(relaxed,t).skill,null);let fired=0;for(let t=1600;t<=2600;t+=100)if(r.update(lPose,t).skill==='zepellion')fired++;assert.equal(fired,1);});
+
+test('after a full spread the cross finishes Zepellion instead of stealing a weak beam',()=>{const r=new GestureRecognizer();for(let t=0;t<=400;t+=100)r.update(gatherPose,t);for(let t=500;t<=900;t+=100)r.update(spreadPose,t);const fired=[];for(let t=1000;t<=4000;t+=100){const out=r.update(cross,t);if(out.skill)fired.push(out.skill);}assert.deepEqual(fired,['zepellion']);});
+
+test('both fists retracted near the chest can still lead to a one-handed straight punch',()=>{const r=new GestureRecognizer(),bent=structuredClone(gatherPose);bent[15].z=bent[16].z=-20/640;r.update(bent,0);r.update(bent,150);const forward=structuredClone(bent);forward[13]={x:275/640,y:220/480,z:-60/640,visibility:1};forward[15]={x:295/640,y:220/480,z:-160/640,visibility:1};const out=r.update(forward,300);assert.equal(out.punch,'left');assert.equal(out.skill,null);assert.equal(out.zepellionStage,0);});

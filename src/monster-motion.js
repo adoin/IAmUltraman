@@ -345,7 +345,9 @@ export class MonsterMotion {
       for (const [bone, rotation] of this.rest) bone.quaternion.copy(rotation);
       this.root.updateWorldMatrix(true, true);
       const gather = active ? ease(active.phase === 'windup' ? active.age / active.windup : 1) : 0;
-      const strike = active?.phase === 'flight' ? ease(active.age / active.flight) : 0;
+      // The limb strike finishes at emission, not when the projectile hits.
+      const releaseFraction=active?.kind==='bolt'?.18:active?.kind==='sweep'?.14:active?.kind==='slam'?.25:1;
+      const strike=active?.phase==='flight'?ease(active.age/active.flight/releaseFraction):0;
       const castSide = active?.safeSide > 0 ? 'L' : 'R';
       const sign = castSide === 'L' ? 1 : -1;
       const spec = active ? moveFor(this.type, active.kind) : null;

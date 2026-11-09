@@ -14,7 +14,8 @@ export const discTiming = (effect) => (effect?.prepared ? DISC_THROW_TIMING : DI
  */
 export const ZEPELLION_TIMING = Object.freeze({
   reach: 0.6,
-  pull: 1.2,
+  pull: 0.86,
+  pullHold: 1.24,
   cross: 1.8,
   ready: 1.85,
   fire: 1.85,
@@ -24,4 +25,5 @@ export const ZEPELLION_TIMING = Object.freeze({
   end: 3.6,
 });
 
-export const beamTimingFor = (kind) => (kind === 'zepellion' ? ZEPELLION_TIMING : BEAM_TIMING);
+export const ZEPELLION_PREPARED_TIMING=Object.freeze({reach:0,pull:0,pullHold:0,cross:0,ready:.12,fire:.12,impact:.37,fade:1.27,lightEnd:1.47,end:1.87});
+export const beamTimingFor=(kind,prepared=false)=>kind==='zepellion'?(prepared?ZEPELLION_PREPARED_TIMING:ZEPELLION_TIMING):BEAM_TIMING;
