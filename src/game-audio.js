@@ -127,6 +127,7 @@ export class GameAudio {
   setMusicFile(file){this.musicElement?.pause();if(this.musicURL)URL.revokeObjectURL(this.musicURL);this.musicURL=file?URL.createObjectURL(file):null;this.musicElement=file?new Audio(this.musicURL):null;if(this.musicElement)this.musicElement.loop=true;this.nextBeat=0;this.syncMusic();}
   stopVoice(){if(this.voiceSource){try{this.voiceSource.stop();}catch{}this.voiceSource=null;}this.voicePriority=0;this.syncMusic();}
   speak(name,priority=1,cooldown=8){if(!this.context||!this.active||!this.enabled||!this.voiceEnabled)return false;const a=this.context,buffer=this.voices.get(name);if(!buffer||a.currentTime-(this.voiceHistory.get(name)??-100)<cooldown||this.voiceSource&&this.voicePriority>=priority)return false;this.stopVoice();const source=a.createBufferSource();source.buffer=buffer;source.connect(this.voiceGain);this.voiceSource=source;this.voicePriority=priority;this.voiceHistory.set(name,a.currentTime);this.musicGain.gain.setTargetAtTime(.045,a.currentTime,.06);if(this.musicElement)this.musicElement.volume=.07;source.onended=()=>{if(this.voiceSource===source){this.voiceSource=null;this.voicePriority=0;this.syncMusic();}};source.start();return true;}
+  footstep({weight=1,side,metal=false}){if(!this.enabled||!this.context||!this.active)return;const now=this.context.currentTime,pan=side==='L'?.2:-.2;this.note(metal?100:70,.18,.12*weight,'sine',now,this.fxGain,32,pan);this.noise(.13,.12*weight,metal?1400:650,now,pan);if(metal)this.note(380,.09,.035*weight,'triangle',now,this.fxGain,160,pan);}
   fanfare(){if(!this.enabled||!this.context||!this.active)return;const now=this.context.currentTime;[587.33,739.99,880,1174.66,880,1174.66].forEach((frequency,index)=>this.note(frequency,.44,.16,'triangle',now+index*.13,this.fxGain));this.noise(.6,.13,6500,now);}
   event(event,battle){
     const model=battle?.waveInfo?.model;
@@ -135,8 +136,9 @@ export class GameAudio {
     if(event.type==='punch')this.effect('punch',event.side);
     if(event.type==='hit')this.effect('hit',event.side);
     if(event.type==='cast')this.effect(event.skill,event.side,event.timing);
-    if(event.type==='telegraph'){this.effect('warning');this.roar('attack',model);}
-    if(event.type==='enemy-cast')this.monsterAttack(event.attack.kind,model);
+    if(event.type==='telegraph'&&(!event.attack.approach||event.attack.approach.mode==='ram')){this.effect('warning');this.roar('attack',model);}
+    if(event.type==='footstep')this.footstep(event);
+    if(event.type==='enemy-cast'){const p=event.attack.approach;if(p?.mode==='blink'){if(this.context&&this.active&&this.enabled){const now=this.context.currentTime;this.note(p.portal==='pillar'?360:620,p.duration,.16,'sine',now,this.fxGain,1400);this.noise(.4,.15,6000,now+p.duration*.5);}}else if(!p||p.mode==='ram')this.monsterAttack(event.attack.kind,model);}
     if(event.type==='attacked'){this.effect('hurt');this.speak(battle.heroHealth<=30?'low':this.hurtIndex++%2?'hurt2':'hurt1',2,14);}
     if(event.type==='defense'&&event.outcome==='block'){this.effect('guard');this.speak('block',1,15);}
     if(event.type==='defense'&&event.outcome==='dodge')this.speak('dodge',1,15);

@@ -1,3 +1,5 @@
+import {MonsterLocomotion} from './monster-locomotion.js';
+import {locomotionFor} from './locomotion.js';
 ﻿import * as THREE from 'three';
 import { EMIT_OFFSETS, REST_ARM, emitFor, moveFor } from './monster-poses.js';
 
@@ -160,6 +162,7 @@ export class MonsterMotion {
           state.node.scale.copy(state.scale);
         }
       }
+    this.locomotion=new MonsterLocomotion(this);
   }
   node(name) {
     return this.nodes.get(key(name));
@@ -315,13 +318,15 @@ export class MonsterMotion {
     bone.quaternion.copy(bone.parent.getWorldQuaternion(Q()).invert().multiply(world));
     bone.updateWorldMatrix(false, true);
   }
-  update(attack, dt, {dead = false, hurt = false, time = 0} = {}) {
+  cancelLocomotion(){this.locomotion.restore();this.locomotion.lastTargets=null;this.attack=null;this.previous=null;this.recovery=1;this.stepEvent=null;}
+  update(attack, dt, {dead=false,hurt=false,time=0,enemyDistance}={}) {
+    this.locomotion.restore();
     if (this.attack !== attack) {
       if (!attack && this.attack) this.recovery = 0;
       this.previous = this.attack;
       this.attack = attack;
     }
-    this.recovery = Math.min(1, this.recovery + dt / 0.35);
+    this.recovery = Math.min(1, this.recovery+dt/(this.previous?.approach?.recovery||.35));
     const active = attack || (this.recovery < 1 ? this.previous : null),
       fade = attack ? 1 : 1 - ease(this.recovery);
     const closing =
@@ -334,6 +339,14 @@ export class MonsterMotion {
           ease(active.phase === 'windup' ? active.age / active.windup : 1) *
           fade
         : 0;
+    this.stepEvent=null;
+    const profile=active?.kind==='charge'?(active.approach||locomotionFor(this.type)):null;
+    if(profile&&profile.mode!=='ram'&&!dead){
+      for(const [bone,rotation]of this.rest)bone.quaternion.copy(rotation);
+      this.root.updateWorldMatrix(true,true);this.lunge=0;this.aimX=0;
+      this.locomotion.update(active,{current:!!attack,fade,recovery:this.recovery,time,enemyDistance});
+      this.stepEvent=this.locomotion.stepEvent;return;
+    }
     if (this.mmd) {
       // Skeletal drive for the converted MMD kaiju: reset, then aim the real
       // limb bones for the pose the current attack needs. Node names differ

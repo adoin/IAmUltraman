@@ -37,7 +37,7 @@ try {
   ])
     for (const kind of kinds) {
       const base = await act(
-        `b.start();b.wave=${wave};b.selectMonster();b.monsterMax=b.monsterHealth=b.waveInfo.hp;b.emit();b.nextAttack=100;b.enemyDistance=${kind === 'melee' ? 16.5 : 35};b.monsterBaseZ=20-b.enemyDistance;b.currentMonster.position.z=b.monsterBaseZ;b.advance(.01);b.beginAttack('${kind}');b.__armLengths=()=>['L','R'].flatMap(side=>{const m=b.monsterMotion,p=n=>m.node(n+'.'+side).getWorldPosition(new T.Vector3());return[p('upperarm').distanceTo(p('forearm')),p('forearm').distanceTo(p('hand'))];});return{windup:b.attack.windup,flight:b.attack.flight,damage:({melee:12,bolt:14,slam:20,sweep:17,charge:22})['${kind}'],lengths:'${name}'==='redking'?b.__armLengths():[]};`,
+        `b.start();b.wave=${wave};b.selectMonster();b.monsterMax=b.monsterHealth=b.waveInfo.hp;b.emit();b.nextAttack=100;b.enemyDistance=${kind === 'melee' ? 16.5 : 35};b.monsterBaseZ=20-b.enemyDistance;b.currentMonster.position.z=b.monsterBaseZ;b.advance(.01);b.beginAttack('${kind}');b.__armLengths=()=>['L','R'].flatMap(side=>{const m=b.monsterMotion,p=n=>m.node(n+'.'+side).getWorldPosition(new T.Vector3());return[p('upperarm').distanceTo(p('forearm')),p('forearm').distanceTo(p('hand'))];});return{windup:b.attack.windup,flight:b.attack.flight,damage:b.attack.damage,lengths:'${name}'==='redking'?b.__armLengths():[]};`,
       );
       await advance(base.windup * 0.9);
       const gather = await act(

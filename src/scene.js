@@ -1,3 +1,5 @@
+import {footGround,liftGroundTail} from './model-grounding.js';
+import {locomotionFor,approachOpacity} from './locomotion.js';
 ﻿import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BattleEngine, SKILLS, CELEBRATION, WAVES} from './combat.js';
@@ -139,10 +141,11 @@ export class BattleScene extends BattleEngine {
         model.traverse(o=>{if(o.isMesh&&o.material.emissive&&!o.material.userData.hitBase){o.material.userData.hitBase=o.material.emissive.clone();}});
         this.monsterAnimations.set(name,gltf.animations);
         const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(V());
-        const torso=model.getObjectByName('upperbody1')||model.getObjectByName('Bip001_Pelvis_05');
+        const torso=model.getObjectByName('upperbody1')||model.getObjectByName('Bip001_Pelvis_05')||model.getObjectByName('KOSHI')||model.getObjectByName('下半身')||model.getObjectByName('センター');
         const anchor=torso?torso.getWorldPosition(V()):bounds.getCenter(V());
-        const factor=16/size.y,wrapper=new THREE.Group();wrapper.add(model);model.scale.multiplyScalar(factor);model.position.add(V(-anchor.x,-bounds.min.y,-anchor.z).multiplyScalar(factor));
-        wrapper.userData.restPose=[];
+        const floor=footGround(model)??bounds.min.y;const factor=16/Math.max(.001,bounds.max.y-floor),wrapper=new THREE.Group();wrapper.add(model);model.scale.multiplyScalar(factor);model.position.add(V(-anchor.x,-floor,-anchor.z).multiplyScalar(factor));
+        wrapper.updateMatrixWorld(true);wrapper.userData.grounding={floor,tailLift:liftGroundTail(wrapper)};
+      wrapper.userData.restPose=[];
         model.traverse(node=>wrapper.userData.restPose.push({node,position:node.position.clone(),quaternion:node.quaternion.clone(),scale:node.scale.clone()}));
         this.models.set(name,wrapper);
       }else this.models.set(name,model);
@@ -272,6 +275,7 @@ export class BattleScene extends BattleEngine {
     }
     const wasLoading=this.loading;this.waveLoadError=null;
     this.monsterMotion?.dispose();if(this.currentMonster)this.renderScene.remove(this.currentMonster);this.currentMonster=this.models.get(this.waveInfo.model);this.monsterBaseZ=20-this.enemyDistance;this.currentMonster.position.set(0,0,this.monsterBaseZ);this.currentMonster.scale.setScalar(this.wave===WAVES.length?1.12:1);this.currentMonster.rotation.set(0,0,0);this.knockbackAt=-Infinity;this.monsterHitAt=-Infinity;this.airborne=false;this.renderScene.add(this.currentMonster);this.currentMonster.visible=true;for(const rest of this.currentMonster.userData.restPose||[]){rest.node.position.copy(rest.position);rest.node.quaternion.copy(rest.quaternion);rest.node.scale.copy(rest.scale);}this.currentMonster.updateMatrixWorld(true);
+    this.setMonsterOpacity(this.currentMonster,1);this.stepAttack=null;this.stepIndex=-1;
     this.monsterMotion=new MonsterMotion(this.currentMonster,this.waveInfo.model,this.monsterAnimations.get(this.waveInfo.model)||[]);
     this.monsterMotion.update(null,0,{time:this.time});
     this.currentMonster.updateWorldMatrix(true,true);
@@ -283,7 +287,7 @@ export class BattleScene extends BattleEngine {
   }
   clearTransient(){for(const e of this.visualEffects)this.disposeObject(e.group);this.visualEffects=[];}
   disposeObject(o){this.renderScene.remove(o);o.traverse(n=>{if(n.isMesh||n.isPoints||n.isSprite){if(!n.isSprite)n.geometry?.dispose();if(Array.isArray(n.material))n.material.forEach(m=>m.dispose());else n.material?.dispose();}});}
-  visualEvent(e){if(!this.renderScene)return;if(e.type==='wave')this.selectMonster();if(e.type==='victory')this.startCelebration();if(e.type==='celebration-end')this.stopCelebration();if(e.type==='remote-interrupted'){for(const fx of this.visualEffects.filter(f=>SKILLS[f.kind]))this.disposeObject(fx.group);this.visualEffects=this.visualEffects.filter(f=>!SKILLS[f.kind]);}if(e.type==='knockback'){this.clearEnemyEffects();this.knockbackAt=this.time;this.airborne=e.airborne;}if(e.type==='cast')this.playerEffect(e.skill,e);if(e.type==='hit'){this.monsterHitAt=this.time;this.hitSide=e.side==='left'?-1:1;this.hitFlash=.3;const point=e.source==='punch'?this.punchHitPoint(e.side):this.getHitPoint();this.impactEffect(e.source,e.side,point);this.sparkBurst(point,this.waveInfo.color,e.source==='punch'?18:34);}if(e.type==='defeat'){this.clearEnemyEffects();this.sparkBurst(V(0,9,-15),0xffd99c,100);this.hurt=0;}if(e.type==='defense'){if(e.outcome==='hit')this.hurt=.5;else if(e.outcome==='block'){this.defenseFlash=.8;this.sparkBurst(V(this.camera.position.x,8,14),0x89ffe6,45);}else if(e.outcome==='dodge')this.sparkBurst(V(this.camera.position.x+5,8,12),0xc1f9ff,20);}if(e.type==='enemy-cast')this.enemyEffect(e.attack);if(e.type==='interrupt'){this.clearEnemyEffects();this.sparkBurst(V(0,10,-12),0xc4fffc,30);}}
+  visualEvent(e){if(!this.renderScene)return;if(e.type==='wave')this.selectMonster();if(e.type==='victory')this.startCelebration();if(e.type==='celebration-end')this.stopCelebration();if(e.type==='remote-interrupted'){for(const fx of this.visualEffects.filter(f=>SKILLS[f.kind]))this.disposeObject(fx.group);this.visualEffects=this.visualEffects.filter(f=>!SKILLS[f.kind]);}if(e.type==='knockback'){this.monsterMotion?.cancelLocomotion();this.clearEnemyEffects();this.knockbackAt=this.time;this.airborne=e.airborne;}if(e.type==='cast')this.playerEffect(e.skill,e);if(e.type==='hit'){this.monsterHitAt=this.time;this.hitSide=e.side==='left'?-1:1;this.hitFlash=.3;const point=e.source==='punch'?this.punchHitPoint(e.side):this.getHitPoint();this.impactEffect(e.source,e.side,point);this.sparkBurst(point,this.waveInfo.color,e.source==='punch'?18:34);}if(e.type==='defeat'){this.clearEnemyEffects();this.sparkBurst(V(0,9,-15),0xffd99c,100);this.hurt=0;}if(e.type==='defense'){if(e.outcome==='hit')this.hurt=.5;else if(e.outcome==='block'){this.defenseFlash=.8;this.sparkBurst(V(this.camera.position.x,8,14),0x89ffe6,45);}else if(e.outcome==='dodge')this.sparkBurst(V(this.camera.position.x+5,8,12),0xc1f9ff,20);}if(e.type==='enemy-cast')this.enemyEffect(e.attack);if(e.type==='interrupt'){this.clearEnemyEffects();this.sparkBurst(V(0,10,-12),0xc4fffc,30);}}
   flare(position,color,size,parent,opacity=1){
     if(!this.flareTexture){
       const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
@@ -355,10 +359,40 @@ export class BattleScene extends BattleEngine {
     }
     if(kind==='slam'){const ring=this.mesh(new THREE.TorusGeometry(1,.12,8,96),glow(this.waveInfo.color),null,group);ring.rotation.x=Math.PI/2;group.position.set(this.currentMonster.position.x,.2,this.currentMonster.position.z);group.visible=false;}
     if(kind==='sweep'){entry.beam=this.mesh(new THREE.CylinderGeometry(.2,.2,1,12),glow(this.waveInfo.color),V(),group);const sheet=new THREE.BufferGeometry();sheet.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(12),3));sheet.setIndex([0,1,2,2,1,3]);entry.sheet=this.mesh(sheet,glow(this.waveInfo.color,.14),V(),group);entry.sheet.frustumCulled=false;entry.source=this.flare(V(),this.waveInfo.color,2,group,.9);}
-    if(kind==='charge'&&this.waveInfo.model==='baltan'){entry.phantom=true;for(let i=0;i<3;i++){const gate=this.mesh(new THREE.TorusGeometry(5,.11,8,48),glow(0x7eeaff,.6),V(0,8,-i*5),group);gate.userData.gate=true;}for(let i=0;i<12;i++){const line=this.mesh(new THREE.CylinderGeometry(.025,.025,5,4),glow(i%2?0xc5ffff:0x4eb5ff,.65),V(Math.sin(i*2.4)*4.6,2+(i%5)*2,-i*.6),group);line.rotation.x=Math.PI/2;}group.position.copy(this.currentMonster.position);}
-    if(kind==='charge'&&!entry.phantom){for(let i=0;i<5;i++)this.flare(V((i-2)*.8,.2,-1),0xb9a58a,1.3,group,.18);group.position.copy(this.currentMonster.position);}
+    if(kind==='charge'){
+      const profile=attack.approach||locomotionFor(this.waveInfo.model);
+      if(profile.mode==='blink'){
+        entry.blink=true;entry.portals=[];
+        for(const z of [this.currentMonster.position.z,20-16.5]){
+          const portal=new THREE.Group();portal.position.set(0,8,z);group.add(portal);
+          if(profile.portal==='pillar'){
+            const cage=this.mesh(new THREE.CylinderGeometry(3.5,3.5,17,12,8,true),glow(0xffd36b,.25),V(),portal);cage.material.wireframe=true;
+            for(let i=0;i<4;i++)this.mesh(new THREE.TorusGeometry(3.8,.04,6,40),glow(0xffe69a,.6),V(0,-6+i*4,0),portal).rotation.x=Math.PI/2;
+          }else{
+            this.mesh(new THREE.TorusGeometry(5,.07,8,64),glow(0x7cecff,.7),V(),portal);
+            this.mesh(new THREE.TorusGeometry(4.5,.035,6,48),glow(0xd6ffff,.6),V(),portal).rotation.z=.25;
+          }
+          entry.portals.push(portal);
+        }
+      }else if(profile.mode==='ram'){this.flare(V(),this.waveInfo.color,2.5,group,.35);group.position.copy(this.currentMonster.position).add(V(0,10,0));entry.ram=true;}
+      else{this.disposeObject(group);return;}
+    }
     this.visualEffects.push(entry);
   }
+  setMonsterOpacity(root,alpha){
+    const allowFade=locomotionFor(this.waveInfo.model).mode==='blink';
+    root.userData.approachAlpha=alpha;
+    root.traverse(mesh=>{if(!mesh.isMesh)return;
+      mesh.userData.approachVisible??=mesh.visible;mesh.userData.approachShadow??=mesh.castShadow;
+      mesh.visible=mesh.userData.approachVisible&&alpha>.015;mesh.castShadow=mesh.userData.approachShadow&&alpha>.9;
+      for(const material of [].concat(mesh.material)){
+        material.userData.approachOpacity??=material.opacity;material.userData.approachDepth??=material.depthWrite;
+        if((alpha<1||allowFade)&&!material.transparent){material.transparent=true;material.forceSinglePass=true;material.needsUpdate=true;}
+        material.opacity=material.userData.approachOpacity*alpha;material.depthWrite=material.userData.approachDepth&&alpha>.98;
+      }
+    });
+  }
+  footDust(step){if(step.weight<.8)return;const group=new THREE.Group();group.position.copy(step.point);group.position.y=.08;this.flare(V(),step.metal?0xe1b994:0xb9a58a,.8+step.weight*.3,group,.13);this.renderScene.add(group);this.visualEffects.push({kind:'enemy-step',group,age:0,duration:.3});}
   sparkBurst(position,color,count){const points=new Float32Array(count*3),velocity=[];for(let i=0;i<count;i++){points.set([position.x,position.y,position.z],i*3);velocity.push(V((Math.random()-.5)*13,(Math.random()-.2)*12,(Math.random()-.5)*13));}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(points,3));const material=new THREE.PointsMaterial({color,size:.14,transparent:true,opacity:1,depthWrite:false,blending:THREE.AdditiveBlending});const group=new THREE.Group();group.add(new THREE.Points(geo,material));this.renderScene.add(group);this.visualEffects.push({kind:'sparks',group,age:0,duration:1.2,velocity});}
   resize(){const {width,height}=this.canvas.getBoundingClientRect();if(!width||!height)return;this.camera.aspect=width/height;this.camera.fov=width<600?66:57;this.camera.updateProjectionMatrix();this.renderer.setSize(width,height,false);}
   setQuality(quality){this.renderer.setPixelRatio(quality==='low'?1:Math.min(devicePixelRatio||1,1.65));this.renderer.shadowMap.enabled=quality!=='low';this.resize();}
@@ -366,14 +400,18 @@ export class BattleScene extends BattleEngine {
     const m=this.currentMonster;if(!m)return;const t=this.time,a=this.attack,winding=a?.phase==='windup'?clamp(a.age/a.windup,0,1):0,attack=a?.phase==='flight';
     m.rotation.y=this.defeated?.18*Math.sin(t):Math.sin(t*.5)*.04;m.position.y=this.defeated?-Math.pow(1-clamp(this.respawn/3,0,1),2)*21:0;this.monsterBaseZ=a?.kind==='charge'&&a.phase==='flight'?20-this.enemyDistance:mix(this.monsterBaseZ,20-this.enemyDistance,1-Math.exp(-dt*8));m.position.z=this.monsterBaseZ;m.position.x=0;if(a?.kind==='sweep'){const scan=a.phase==='flight'?clamp(a.age/a.flight,0,1):0,ready=a.phase==='windup'?clamp(a.age/a.windup,0,1):1;m.rotation.y+=Math.atan2(-a.safeSide*11*(1-scan),this.enemyDistance)*ready;}
     if(this.time-this.knockbackAt<1){const t=this.time-this.knockbackAt;m.position.y=this.airborne?Math.sin(t*Math.PI)*4:0;m.rotation.x=-Math.sin(t*Math.PI)*.24;}else m.rotation.x=0;
-    if(a?.kind==='charge'&&!this.defeated&&this.time-this.knockbackAt>=1){const dip=a.phase==='windup'?clamp(a.age/a.windup,0,1):1;m.rotation.x=(FLOATERS.has(this.waveInfo.model)?.32:.16)*dip;m.position.y-=dip*.22;}
+    const approach=a?.kind==='charge'?(a.approach||locomotionFor(this.waveInfo.model)):null;
+    if(approach&&approach.mode!=='ram'){m.rotation.y=0;m.rotation.x=0;}
+    if(approach?.mode==='ram'&&!this.defeated&&this.time-this.knockbackAt>=1){const dip=a.phase==='windup'?clamp(a.age/a.windup,0,1):1;m.rotation.x=.13*dip;}
     if(FLOATERS.has(this.waveInfo.model)&&!this.defeated){m.position.y+=Math.sin(t*1.8)*.06;if(a?.kind==='melee')m.position.z+=Math.sin(clamp(a.age/(a.phase==='windup'?a.windup:a.flight),0,1)*Math.PI)*.8;}
-    this.monsterMotion?.update(a,dt,{dead:this.defeated,hurt:this.time-this.monsterHitAt<.22||this.time-this.knockbackAt<.7,time:t});m.position.z+=this.monsterMotion?.lunge||0;m.position.x+=this.monsterMotion?.aimX||0;
+    this.monsterMotion?.update(a,dt,{dead:this.defeated,hurt:this.time-this.monsterHitAt<.22||this.time-this.knockbackAt<.7,time:t,enemyDistance:this.enemyDistance});m.position.z+=this.monsterMotion?.lunge||0;m.position.x+=this.monsterMotion?.aimX||0;
+    const step=this.monsterMotion?.stepEvent;if(step&&(this.stepAttack!==a||this.stepIndex!==step.key)){this.stepAttack=a;this.stepIndex=step.key;this.clientEvent({type:'footstep',...step});this.footDust(step);}
+    this.setMonsterOpacity(m,approach?.mode==='blink'&&a.phase==='flight'?approachOpacity(approach,a.age/a.flight):1);
     if(this.chargeGroup){const charging=a?.phase==='windup'&&(a.kind==='bolt'||a.kind==='sweep'||a.kind==='charge'&&FLOATERS.has(this.waveInfo.model));this.chargeGroup.visible=!!charging;const progress=charging?clamp(a.age/a.windup,0,1):0;this.chargeGroup.position.copy(this.monsterMotion.origin(this.monsterMotion.castSide(a)));this.heldRock.visible=charging&&this.waveInfo.model==='redking';this.chargeFlare.visible=!this.heldRock.visible;this.chargeFlare.material.color.setHex(this.waveInfo.color);this.chargeFlare.material.opacity=progress*.8;this.chargeFlare.scale.setScalar(.4+progress*2);}
     const hitAge=this.time-this.monsterHitAt,flash=hitAge>=0&&hitAge<.1?(1-hitAge/.1)*(this.reduced?.12:.28):0;
     m.traverse(o=>{if(o.isMesh&&o.material.userData.hitBase)o.material.emissive.copy(o.material.userData.hitBase).lerp(hitColor,flash);});
     if(hitAge>=0&&hitAge<.2){m.rotation.z=this.hitSide*Math.sin(hitAge/.2*Math.PI)*.055;m.position.z-=Math.sin(hitAge/.2*Math.PI)*.45;}else m.rotation.z=0;
-    this.warningRing.visible=false;this.warningRing.material.opacity=.35+Math.sin(t*10)*.2;this.warningRing.scale.setScalar(1+winding*.15);this.safeZone.visible=false;if(a)this.safeZone.position.x=a.safeSide*6;this.monsterLight.intensity=winding*12+this.hitFlash*8;
+    this.warningRing.visible=false;this.warningRing.material.opacity=.35+Math.sin(t*10)*.2;this.warningRing.scale.setScalar(1+winding*.15);this.safeZone.visible=false;if(a)this.safeZone.position.x=a.safeSide*6;this.monsterLight.intensity=(!approach||approach.mode==='ram'?winding*12:0)+this.hitFlash*8;
   }
   start(){
     super.start();this.stopCelebration();this.guardAmount=0;this.guardWasActive=false;this.shieldIgnition=0;this.defenseFlash=0;this.hurt=0;this.hitFlash=0;
@@ -441,7 +479,11 @@ export class BattleScene extends BattleEngine {
         e.sourceCore.position.copy(e.start);e.sourceCore.material.opacity=(firing?.9:charge*.55)*fade;
         e.contact.position.copy(e.end);e.contact.material.opacity=e.age>=bt.impact?.65*fade:0;e.light.position.copy(e.start);e.light.intensity=(firing?65:charge*18)*fade;
       }
-      if(e.kind==='impact'){for(const [i,ring]of e.rings.entries()){ring.scale.setScalar(1+t*(3+i));ring.material.opacity=(1-t)*.85;}e.group.children.filter(o=>o.isSprite).forEach(o=>{o.material.opacity=1-t;});e.light.intensity*=Math.max(0,1-dt*8);}if(e.kind==='enemy-bolt'){const release=e.rock?.15:.2;if(t<release)e.start.copy(this.monsterMotion.origin(e.side));const flight=clamp((t-release)/(1-release),0,1);e.group.position.lerpVectors(e.start,e.end,flight);if(e.rock)e.group.position.y+=Math.sin(flight*Math.PI)*3;e.group.rotation.z=e.age*(e.rock?2:5);e.group.scale.setScalar(e.rock?1:1+flight*.8);}if(e.kind==='enemy-slam'){const travel=clamp((t-.28)/.72,0,1);e.group.visible=t>=.28;e.group.scale.setScalar(1+travel*this.enemyDistance);e.group.children[0].material.opacity=1-travel*.7;}if(e.kind==='enemy-sweep'){const start=this.monsterMotion.origin(e.side),end=V(-e.safeSide*11*(1-t),8,20),delta=end.clone().sub(start);e.beam.position.copy(start).addScaledVector(delta,.5);e.beam.quaternion.setFromUnitVectors(V(0,1,0),delta.clone().normalize());e.beam.scale.set(1,delta.length(),1);e.source.position.copy(start);const positions=e.sheet.geometry.attributes.position;positions.setXYZ(0,start.x,start.y-.12,start.z);positions.setXYZ(1,start.x,start.y+.12,start.z);positions.setXYZ(2,-e.safeSide*11,8,20);positions.setXYZ(3,end.x,end.y,end.z);positions.needsUpdate=true;e.group.visible=t>=.15;}if(e.kind==='enemy-charge'){e.group.position.copy(this.currentMonster.position);e.group.scale.setScalar(1+t*.5);for(const puff of e.group.children){if(e.phantom){puff.material.opacity=Math.sin(t*Math.PI)*.7;if(puff.userData.gate)puff.scale.setScalar(.6+t*.8);}else{puff.position.y=.2+Math.sin(e.age*12+puff.position.x)*.12;puff.material.opacity=.18*(1-t*.5);}}}if(e.kind==='sparks'){const points=e.group.children[0],array=points.geometry.attributes.position.array;e.velocity.forEach((v,i)=>{array[i*3]+=v.x*dt;array[i*3+1]+=v.y*dt;array[i*3+2]+=v.z*dt;v.y-=5*dt;});points.geometry.attributes.position.needsUpdate=true;points.material.opacity=1-t;}}
+      if(e.kind==='impact'){for(const [i,ring]of e.rings.entries()){ring.scale.setScalar(1+t*(3+i));ring.material.opacity=(1-t)*.85;}e.group.children.filter(o=>o.isSprite).forEach(o=>{o.material.opacity=1-t;});e.light.intensity*=Math.max(0,1-dt*8);}if(e.kind==='enemy-bolt'){const release=e.rock?.15:.2;if(t<release)e.start.copy(this.monsterMotion.origin(e.side));const flight=clamp((t-release)/(1-release),0,1);e.group.position.lerpVectors(e.start,e.end,flight);if(e.rock)e.group.position.y+=Math.sin(flight*Math.PI)*3;e.group.rotation.z=e.age*(e.rock?2:5);e.group.scale.setScalar(e.rock?1:1+flight*.8);}if(e.kind==='enemy-slam'){const travel=clamp((t-.28)/.72,0,1);e.group.visible=t>=.28;e.group.scale.setScalar(1+travel*this.enemyDistance);e.group.children[0].material.opacity=1-travel*.7;}if(e.kind==='enemy-sweep'){const start=this.monsterMotion.origin(e.side),end=V(-e.safeSide*11*(1-t),8,20),delta=end.clone().sub(start);e.beam.position.copy(start).addScaledVector(delta,.5);e.beam.quaternion.setFromUnitVectors(V(0,1,0),delta.clone().normalize());e.beam.scale.set(1,delta.length(),1);e.source.position.copy(start);const positions=e.sheet.geometry.attributes.position;positions.setXYZ(0,start.x,start.y-.12,start.z);positions.setXYZ(1,start.x,start.y+.12,start.z);positions.setXYZ(2,-e.safeSide*11,8,20);positions.setXYZ(3,end.x,end.y,end.z);positions.needsUpdate=true;e.group.visible=t>=.15;}if(e.kind==='enemy-charge'){
+        if(e.blink){for(const [index,portal]of e.portals.entries()){const strength=index?Math.sin(Math.PI*clamp((t-.2)/.8,0,1)):Math.sin(Math.PI*clamp(t/.75,0,1));portal.rotation.z=e.age*(index?-1:1)*.6;portal.scale.setScalar(.85+Math.sin(t*Math.PI)*.2);portal.traverse(mesh=>{if(mesh.isMesh)mesh.material.opacity=strength*.55;});}}
+        else if(e.ram)e.group.position.copy(this.currentMonster.position).add(V(0,10,0));
+      }if(e.kind==='enemy-step'){e.group.scale.setScalar(1+t);e.group.children[0].material.opacity=(1-t)*.13;}
+      if(e.kind==='sparks'){const points=e.group.children[0],array=points.geometry.attributes.position.array;e.velocity.forEach((v,i)=>{array[i*3]+=v.x*dt;array[i*3+1]+=v.y*dt;array[i*3+2]+=v.z*dt;v.y-=5*dt;});points.geometry.attributes.position.needsUpdate=true;points.material.opacity=1-t;}}
     this.visualEffects=this.visualEffects.filter(e=>{if(e.age<e.duration)return true;this.disposeObject(e.group);return false;});
   }
   advance(dt){if(this.loading)return;for(let remaining=dt;remaining>1e-8;){const step=Math.min(remaining,1/60);this.update(step);remaining-=step;}this.animateMonster(dt);this.animateHands(dt);this.animateEffects(dt);if(this.celebration)this.animateCelebration(dt);}
