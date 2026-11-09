@@ -20,7 +20,8 @@
     "test:zepellion": "node scripts/zepellion-check.mjs",
     "test:reliability": "node scripts/reliability-check.mjs",
     "test:pressure": "node scripts/pressure-check.mjs",
-    "test:locomotion": "node scripts/locomotion-check.mjs"
+    "test:locomotion": "node scripts/locomotion-check.mjs",
+    "test:cdn": "node scripts/cdn-check.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "0.10.32",

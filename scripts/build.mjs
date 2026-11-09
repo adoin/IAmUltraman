@@ -1,5 +1,6 @@
 import { mkdir, cp, rm, stat, readFile, writeFile, readdir } from 'node:fs/promises';
 import {createHash} from 'node:crypto';
+import {assetBase,treeDigest,rewriteAssets} from './deployment-assets.mjs';
 await mkdir('public/vendor/three/addons/loaders',{recursive:true});
 await mkdir('public/vendor/three/addons/utils',{recursive:true});
 for(const file of ['three.module.js','three.core.js'])await cp(`node_modules/three/build/${file}`,`public/vendor/three/${file}`);
@@ -21,7 +22,10 @@ const revision=createHash('sha256').update(entry+css+sources.join('\n')+await re
 for(const model of (await readdir('public/models/kaiju')).filter(f=>f.endsWith('.glb')).sort())revision.update(await readFile('public/models/kaiju/'+model));
 for(const file of (await readdir('public/audio')).filter(f=>/\.(ogg|wav|mp3)$/.test(f)||f==='voices.json').sort())revision.update(await readFile('public/audio/'+file));
 revision.update(await readFile('public/motion-preview/tiga-flight.glb'));
+const cdnBase=assetBase(process.env.ASSET_BASE_URL),assetVersion=await treeDigest('public');
+revision.update(cdnBase);
 const version=revision.digest('hex').slice(0,12);
-for(let i=0;i<scripts.length;i++)await writeFile(`dist/src/${scripts[i]}`,sources[i].replace(/(['"])(\.{1,2}\/[^'"\s]+\.js)\1/g,(_,quote,url)=>`${quote}${url}?v=${version}${quote}`));
+for(let i=0;i<scripts.length;i++)await writeFile(`dist/src/${scripts[i]}`,rewriteAssets(sources[i].replace(/(['"])(\.{1,2}\/[^'"\s]+\.js)\1/g,(_,quote,url)=>`${quote}${url}?v=${version}${quote}`),cdnBase,assetVersion));
 await writeFile('dist/index.html',entry.replace('./style.css','./style.css?v='+version).replace('./src/main.js','./src/main.js?v='+version).replaceAll('./public/poses.svg#','./public/poses.svg?v='+version+'#'));
+await writeFile('dist/deployment.json',JSON.stringify({version,assetVersion,cdnBase,revision:process.env.SOURCE_REVISION||'local'},null,2));
 console.log('Static site built in dist/');

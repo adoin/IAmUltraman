@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ultraman-production
+  cancel-in-progress: false
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -17,8 +20,38 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          ASSET_BASE_URL: ${{ vars.ASSET_BASE_URL }}
+          SOURCE_REVISION: ${{ github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: github-pages-static-site
           path: dist/
           include-hidden-files: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deployment-tools
+          path: |
+            scripts/deploy-release.mjs
+            scripts/deployment-assets.mjs
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && vars.ALI99_DEPLOY_ENABLED == 'true'
+    runs-on: [self-hosted, Linux, ultraman-ali99]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: github-pages-static-site
+          path: ${{ runner.temp }}/ultraman-${{ github.run_id }}/site
+      - uses: actions/download-artifact@v4
+        with:
+          name: deployment-tools
+          path: ${{ runner.temp }}/ultraman-${{ github.run_id }}/tools
+      - name: Publish and check health
+        run: node "$RUNNER_TEMP/ultraman-$GITHUB_RUN_ID/tools/deploy-release.mjs"
+        env:
+          DEPLOY_INPUT: ${{ runner.temp }}/ultraman-${{ github.run_id }}/site
+          DEPLOY_ROOT: /srv/iamultraman
+          RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          SITE_URL: ${{ vars.ALI99_SITE_URL }}
