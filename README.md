@@ -2,6 +2,18 @@
 
 面向儿童的第一人称 3D 体感游戏。Three.js 渲染巨人视角的城市、迪迦的蒙皮手臂与面前的怪兽；MediaPipe 在本机分析动作。雷德王、巴尔坦星人、加恩Q 起头，十一波远近战（最终 boss 加坦杰厄），四种远程招式、胸前 X 护盾与侧身闪避、星星奖励与合成音效。部署于 https://adoin.github.io/ultraman-play/ 。
 
+## 在线体验与社区
+
+- [GitHub Pages 体验](https://adoin.github.io/ultraman-play/)
+- [EdgeOne 体验](https://ultraman.emssion.com/)
+- [完整项目源码](https://github.com/adoin/IAmUltraman)
+
+本项目链接并认可 [LINUX DO](https://linux.do/) 社区。欢迎交流浏览器体感游戏、动作识别和开源开发。
+
+### 许可范围
+
+本项目原创程序代码采用 [MIT License](LICENSE)。模型、角色形象、贴图、第三方库和音频不因代码使用 MIT 而改变原有许可，详见 [第三方来源与许可](THIRD_PARTY_NOTICES.md)。部分角色素材为 CC BY-NC 或仅限非商业学习使用；请勿将整个素材包视为可商用的 MIT 资产。无需注册或登录即可试玩，摄像头影像与动作分析在玩家设备本机处理。
+
 ## 本地运行
 
 ```sh
@@ -11,7 +23,7 @@ npm run build
 npm run dev
 ```
 
-打开 http://localhost:4173 。不需要摄像头也能按 J / U / K / O 或点击技能卡游玩，按 Z 出左拳、X 出右拳，F 或点击画面交替出拳，按住 L 防御、按住 A / D 侧身闪避。准备区可看动作图解、设置画质难度、开启摄像头和视频预览，确认后再进入。进入后保留城市、怪兽、动作特效与双方血条，准星、摄像头预览、文字提示和按钮均在准备区。待机不显示双手，出拳、技能和防御时才显示。Esc / P / 空格或手机双指轻点返回准备区；继续后回到仅有双方血条的战斗。通关或失败时也返回准备区显示结果。设置包含难度、画质、安心练习与识别诊断。摄像头部署必须 HTTPS；localhost 可开发。使用支持 WebGL 2、Worker、OffscreenCanvas 与 createImageBitmap 的近期 Chrome / Edge / Safari，性能不足可切换流畅画质。
+打开 http://localhost:4173 。不需要摄像头也能按 J / U / K / O 或点击技能卡游玩，按 Z 出左拳、X 出右拳，F 或点击画面交替出拳，按住 L 防御、按住 A / D 侧身闪避。准备区可看动作图解、设置画质难度、开启摄像头和视频预览，确认后再进入。进入后保留城市、怪兽、动作特效、双方血条与紧凑技能冷却条，准星、摄像头预览、文字提示和按钮均在准备区。待机不显示双手，出拳、技能和防御时才显示。Esc / P / 空格或手机双指轻点返回准备区；继续后回到战斗视角与紧凑技能条。通关或失败时也返回准备区显示结果。设置包含难度、画质、安心练习与识别诊断。摄像头部署必须 HTTPS；localhost 可开发。使用支持 WebGL 2、Worker、OffscreenCanvas 与 createImageBitmap 的近期 Chrome / Edge / Safari，性能不足可切换流畅画质。
 
 `npm run build` 同步 Three.js 运行时并生成 `dist/`，`npm run dev -- --dist` 预览发布文件。无前端框架或打包器。Three.js、GLB、MediaPipe、WASM 与姿态模型均随站点部署，运行时不请求第三方模型 CDN。字体加载失败自动使用系统字体。
 

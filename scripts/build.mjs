@@ -12,6 +12,7 @@ await rm('dist',{recursive:true,force:true});
 await mkdir('dist',{recursive:true});
 for (const file of ['index.html','style.css','src']) await cp(file,`dist/${file}`,{recursive:true});
 await cp('THIRD_PARTY_NOTICES.md','dist/THIRD_PARTY_NOTICES.md');
+await cp('LICENSE','dist/LICENSE');
 await cp('public','dist/public',{recursive:true});
 await cp('public/.nojekyll','dist/.nojekyll');
 // Version every application module together so a previous visit cannot mix 2D and 3D code.
