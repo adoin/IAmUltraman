@@ -1,3 +1,4 @@
+import {t} from './i18n.js';
 import {SKILLS,SHIELD,ATTACKS} from './combat.js';
 
 const clamp=value=>Math.max(0,Math.min(1,value));
@@ -51,13 +52,13 @@ export class SkillHUD {
       const attack=battle.attack,untilImpact=attack?(attack.phase==='windup'?attack.windup-attack.age:0)+attack.flight-(attack.phase==='flight'?attack.age:0):Infinity;
       const needsGuard=item.skill==='guard'&&ATTACKS[attack?.kind]?.defense==='guard'&&untilImpact<=SHIELD.duration-.15&&!battle.guard&&!battle.paused;
       button.classList.toggle('needs-guard',needsGuard);
-      button.querySelector('.combat-skill-label').textContent=needsGuard?'举盾':labels[item.skill];
+      button.querySelector('.combat-skill-label').textContent=t(needsGuard?'举盾':labels[item.skill]);
       if(cell.state==='cooldown'&&item.state==='ready'&&!battle.paused){button.classList.remove('skill-ready-pop');void button.offsetWidth;button.classList.add('skill-ready-pop');}
       if(item.state!=='ready')button.classList.remove('skill-ready-pop');
       button.dataset.state=item.state;button.classList.toggle('is-active',item.active);
       cell.ring.style.strokeDashoffset=String(100*(1-item.progress));
       if(cell.time.textContent!==item.text)cell.time.textContent=item.text;
-      const label=item.name+'，'+(needsGuard?'重击来袭，请举盾；':'')+item.description;if(button.getAttribute('aria-label')!==label){button.setAttribute('aria-label',label);button.title=label;}
+      const label=t(item.name)+', '+(needsGuard?t('重击来袭，请举盾；'):'')+t(item.description);if(button.getAttribute('aria-label')!==label){button.setAttribute('aria-label',label);button.title=label;}
       button.setAttribute('aria-disabled',String(!['ready','charging','guarding'].includes(item.state)||battle.paused));
       if(item.skill==='guard')button.setAttribute('aria-pressed',String(item.active));
       cell.state=item.state;
