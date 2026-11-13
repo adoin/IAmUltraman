@@ -1,0 +1,3 @@
+import{test}from'node:test';import assert from'node:assert/strict';import{PoseHold}from'../src/pose-hold.js';
+test('a missing observation does not earn dwell time and a long miss clears progress',()=>{const hold=new PoseHold(220);hold.update(true,0);assert.equal(hold.update(true,100),100);assert.equal(hold.update(false,180),100);assert.equal(hold.update(true,240),100);assert.equal(hold.update(true,340),200);hold.update(false,400);assert.equal(hold.update(false,700),0);assert.equal(hold.update(true,750),0);});
+test('a slow but continuous stream counts valid dwell; a seek starts over',()=>{const hold=new PoseHold();hold.update(true,0);assert.equal(hold.update(true,550),550);assert.equal(hold.update(true,100),0);assert.equal(hold.update(true,1100),0);});

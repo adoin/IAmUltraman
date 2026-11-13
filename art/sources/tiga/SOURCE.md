@@ -12,6 +12,7 @@
 The original file is kept unchanged. `art/import_tiga.py` creates an adapted first-person version: arm-only mesh extraction, simplified deform skeleton and skin weights, preserved articulated fingers, one surface subdivision, portable PBR materials, and a 2048-pixel conversion of the author's packed Multi-Type color texture. The original procedural Eevee shaders, controllers, dependency cycles, and drivers are not used by the website. External-file auto-execution stays disabled during import.
 
 Runtime derivative: `public/models/kaiju/hero-hands.glb`.
+Third-person derivative: `public/models/kaiju/hero-body.glb`, exported by `art/import_tiga_body.py` from the same retained source. The complete body, eyes and color timer use a clean 52-bone FK rig, including articulated fingers, and the existing calibrated PBR textures resized to 1024 pixels. Third-person motion retargets the game's authored arm poses; source constraints and drivers are omitted. The source author and CC-BY-NC declaration also remain in the GLB extras.
 Editable derivative: `art/models/tiga-first-person.blend`.
 Texture derivative: `art/textures/tiga/tiga-multi-color.jpg`.
 

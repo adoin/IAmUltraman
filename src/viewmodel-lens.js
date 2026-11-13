@@ -9,6 +9,7 @@ const MIN_HORIZONTAL_FOV=57;
 export class ViewmodelLens {
   constructor(worldCamera,arms){
     this.worldCamera=worldCamera;
+    this.renderCamera=worldCamera;
     this.camera=new THREE.PerspectiveCamera();
     worldCamera.add(this.camera);
     const focal={value:1};
@@ -21,7 +22,7 @@ export class ViewmodelLens {
         shader.uniforms.armFocalScale=focal;
         shader.vertexShader='uniform float armFocalScale;\n'+shader.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\ngl_Position.xy *= armFocalScale;');
       };
-      material.onBeforeRender=(_renderer,_scene,camera)=>{focal.value=camera===worldCamera?this.scale:1;};
+      material.onBeforeRender=(_renderer,_scene,camera)=>{focal.value=camera===this.renderCamera?this.scale:1;};
       material.customProgramCacheKey=()=>'tiga-viewmodel-lens-v1';
     }
   }

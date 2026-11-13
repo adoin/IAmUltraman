@@ -5,6 +5,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {BattleEngine, SKILLS, CELEBRATION, WAVES} from './combat.js';
 import {MonsterMotion} from './monster-motion.js';
 import {HeroAnimation} from './hero-animation.js';
+import {ThirdPersonHero} from './third-person-hero.js';
 import {BEAM_TIMING,DISC_TIMING,ZEPELLION_TIMING,discTiming,beamTimingFor} from './action-timing.js';
 import {BeamVolume} from './beam-effect.js';
 const clamp=THREE.MathUtils.clamp,mix=THREE.MathUtils.lerp;
@@ -19,6 +20,7 @@ export class BattleScene extends BattleEngine {
     this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.renderScene=new THREE.Scene();this.renderScene.background=new THREE.Color(0x345572);this.renderScene.fog=new THREE.FogExp2(0x526b80,.008);
     this.camera=new THREE.PerspectiveCamera(57,1,.08,700);this.camera.position.set(0,9,20);this.camera.lookAt(0,6,-25);this.renderScene.add(this.camera);
+    this.playerCamera=this.camera.clone();this.renderScene.add(this.playerCamera);this.viewMode='first';
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.65));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     this.models=new Map();this.monsterAnimations=new Map();this.currentMonster=null;this.visualEffects=[];this.hitFlash=0;this.hurt=0;this.defenseFlash=0;this.renderLean=0;this.guardAmount=0;this.modelError=null;this.assetReady=false;this.zepellionStage=0;this.lastNow=performance.now();this.frameCount=0;this.victoryActor=null;this.victoryMixer=null;this.victoryClip=null;this.celebration=null;this.celebrationAge=0;
@@ -77,7 +79,7 @@ export class BattleScene extends BattleEngine {
     }));
   }
   makeForeground(){
-    this.hands=new THREE.Group();this.camera.add(this.hands);this.handMeshes=[];
+    this.hands=new THREE.Group();this.playerCamera.add(this.hands);this.handMeshes=[];
     this.shield=this.mesh(new THREE.PlaneGeometry(4.4,3.7),new THREE.ShaderMaterial({
       transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false,
       uniforms:{energy:{value:0},time:{value:0}},
@@ -96,8 +98,8 @@ export class BattleScene extends BattleEngine {
           gl_FragColor=vec4(.32,1.0,.82,(hex*.14*mask+rim*.55+ripple*mask)*energy);
           #include <colorspace_fragment>
         }`,
-    }),V(0,-.23,-2.8),this.camera);
-    this.shieldGlow=this.mesh(new THREE.RingGeometry(1.4,1.47,64),glow(0x88ffe9,0),V(0,-.23,-2.5),this.camera);
+    }),V(0,-.23,-2.8),this.playerCamera);
+    this.shieldGlow=this.mesh(new THREE.RingGeometry(1.4,1.47,64),glow(0x88ffe9,0),V(0,-.23,-2.5),this.playerCamera);
     const reticle=new THREE.Group();this.camera.add(reticle);reticle.visible=false;const m=glow(0x9ef9ef,.65);for(const axis of [0,1])this.mesh(new THREE.PlaneGeometry(axis?.003:.03,axis?.03:.003),m,V(0,0,-2),reticle);reticle.position.y=-.06;
     this.discPreview=new THREE.Group();this.renderScene.add(this.discPreview);this.discPreview.visible=false;
     this.mesh(new THREE.TorusGeometry(.38,.026,8,48),glow(0xffd169),null,this.discPreview);
@@ -114,7 +116,7 @@ export class BattleScene extends BattleEngine {
     const handRoot=this.models.get('hero-hands');
     this.hands.add(handRoot);
     for(const tag of ['L','R']){const arm=handRoot.getObjectByName('HeroArm'+tag);this.handMeshes.push(arm);}
-    this.hero=new HeroAnimation(this.handMeshes,this.camera);
+    this.hero=new HeroAnimation(this.handMeshes,this.playerCamera);this.hero.lens.renderCamera=this.camera;
     this.warmViewmodel();
     this.victoryReady=this.loadVictoryModel(loader,revision).catch(()=>{});
     this.assetReady=true;
@@ -302,7 +304,7 @@ export class BattleScene extends BattleEngine {
     if(kind==='palm'){this.hero.palmSide=data.side||'right';this.hero.updateSockets();}
     if(kind==='disc'){this.hero.discSide=data.side||'right';this.hero.updateSockets();}
     const group=new THREE.Group();this.renderScene.add(group);this.camera.updateMatrixWorld(true);
-    const start=this.hero.socketWorld(kind),end=this.getHitPoint();
+    const start=this.playerSocket(kind),end=this.getHitPoint();
     const beamFamily=kind==='beam'||kind==='zepellion',ultra=kind==='zepellion';
     const timing=data.timing||(kind==='disc'?discTiming(data):beamFamily?beamTimingFor(kind,data.prepared):null);
     const entry={kind,group,side:data.side,prepared:data.prepared,timing,age:0,duration:beamFamily?timing.lightEnd:timing?.end??SKILLS[kind].duration,start,end};
@@ -321,7 +323,7 @@ export class BattleScene extends BattleEngine {
       for(let i=0;i<16;i++){const a=i*Math.PI/8;const tooth=this.mesh(new THREE.ConeGeometry(.045,.11,3),glow(0xffe4a3),V(Math.cos(a)*.395,Math.sin(a)*.395,0),disc);tooth.rotation.z=a-Math.PI/2;}
       entry.halo=this.flare(V(),0xffb746,1.35,disc,.25);
       entry.trail=[];for(let i=0;i<6;i++)entry.trail.push(this.flare(start,0xffca69,.75-i*.07,group,.22-i*.025));
-      const light=new THREE.PointLight(0xffcc70,16,10,1.5);disc.add(light);entry.discSize=(this.camera.aspect<1?.8:1)*this.hero.lens.scale;
+      const light=new THREE.PointLight(0xffcc70,16,10,1.5);disc.add(light);entry.discSize=this.viewMode==='third'?2.4:(this.camera.aspect<1?.8:1)*this.hero.lens.scale;
     }
     this.visualEffects.push(entry);
   }
@@ -394,7 +396,18 @@ export class BattleScene extends BattleEngine {
   }
   footDust(step){if(step.weight<.8)return;const group=new THREE.Group();group.position.copy(step.point);group.position.y=.08;this.flare(V(),step.metal?0xe1b994:0xb9a58a,.8+step.weight*.3,group,.13);this.renderScene.add(group);this.visualEffects.push({kind:'enemy-step',group,age:0,duration:.3});}
   sparkBurst(position,color,count){const points=new Float32Array(count*3),velocity=[];for(let i=0;i<count;i++){points.set([position.x,position.y,position.z],i*3);velocity.push(V((Math.random()-.5)*13,(Math.random()-.2)*12,(Math.random()-.5)*13));}const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(points,3));const material=new THREE.PointsMaterial({color,size:.14,transparent:true,opacity:1,depthWrite:false,blending:THREE.AdditiveBlending});const group=new THREE.Group();group.add(new THREE.Points(geo,material));this.renderScene.add(group);this.visualEffects.push({kind:'sparks',group,age:0,duration:1.2,velocity});}
-  resize(){const {width,height}=this.canvas.getBoundingClientRect();if(!width||!height)return;this.camera.aspect=width/height;this.camera.fov=width<600?66:57;this.camera.updateProjectionMatrix();this.renderer.setSize(width,height,false);}
+  resize(){const {width,height}=this.canvas.getBoundingClientRect();if(!width||!height)return;this.camera.aspect=width/height;this.camera.fov=width<600?66:57;this.camera.updateProjectionMatrix();this.playerCamera.aspect=this.camera.aspect;this.playerCamera.fov=this.camera.fov;this.playerCamera.updateProjectionMatrix();this.renderer.setSize(width,height,false);}
+  async setViewMode(mode){
+    if(!['first','third'].includes(mode))throw new Error('Unknown viewpoint');
+    await this.ready;
+    if(mode==='third'&&!this.thirdHero){
+      this.thirdHeroLoad??=this.loader.loadAsync(new URL(`../public/models/kaiju/hero-body.glb?v=${this.revision}`,import.meta.url).href).then(gltf=>new ThirdPersonHero(gltf.scene,this.renderScene)).catch(error=>{this.thirdHeroLoad=null;throw error;});
+      this.thirdHero=await this.thirdHeroLoad;
+    }
+    this.viewMode=mode;this.hero.thirdPerson=mode==='third';this.hero.aspect=null;this.hero.reset();if(this.thirdHero)this.thirdHero.root.visible=mode==='third'&&this.playing&&!this.finished&&!this.loading;
+    this.animateHands(0);this.resize();return mode;
+  }
+  playerSocket(kind){return this.viewMode==='third'&&this.thirdHero?this.thirdHero.socketWorld(kind,this.hero):this.hero.socketWorld(kind);}
   setQuality(quality){this.renderer.setPixelRatio(quality==='low'?1:Math.min(devicePixelRatio||1,1.65));this.renderer.shadowMap.enabled=quality!=='low';this.resize();}
   animateMonster(dt){
     const m=this.currentMonster;if(!m)return;const t=this.time,a=this.attack,winding=a?.phase==='windup'?clamp(a.age/a.windup,0,1):0,attack=a?.phase==='flight';
@@ -419,6 +432,7 @@ export class BattleScene extends BattleEngine {
     this.hero?.reset();
   }
   punchHitPoint(side){
+    if(this.viewMode==='third'&&this.thirdHero){const from=this.thirdHero.point('Hand_'+(side==='left'?'L':'R')),to=this.getHitPoint();const ray=new THREE.Raycaster(from,to.clone().sub(from).normalize());this.currentMonster.updateWorldMatrix(true,true);return ray.intersectObject(this.currentMonster,true)[0]?.point||to;}
     const index=side==='left'?0:1,rig=this.hero.rigs[index];
     const wristWorld=this.hero.lens.effectPoint(rig.metrics().wrist);
     this.currentMonster.updateWorldMatrix(true,true);
@@ -439,6 +453,7 @@ export class BattleScene extends BattleEngine {
   poseTigaFingers(arm,side,target){this.hero.poseHand(side==='L'?0:1,target>.5?'fist':'shield');}
   animateHands(dt){
     if(this.celebrating>0){
+      if(this.thirdHero)this.thirdHero.root.visible=false;
       // The celebration shows Tiga's whole body from behind the shoulders, so
       // the first-person arms and the shield layer step aside.
       this.hands.visible=false;this.guardAmount=0;this.guardWasActive=false;
@@ -451,29 +466,36 @@ export class BattleScene extends BattleEngine {
     const palm=this.effects.find(e=>e.kind==='palm');
     const guard=!beam&&!disc&&!palm&&!punch&&this.guard&&this.guardEnergy>0?1:0;
     if(guard&&!this.guardWasActive)this.shieldIgnition=.55;this.guardWasActive=guard;this.shieldIgnition=Math.max(0,(this.shieldIgnition||0)-dt);this.guardAmount=mix(this.guardAmount,guard,factor);
-    this.camera.position.x=this.renderLean*4.5;this.camera.position.y=9+(this.reduced?0:Math.sin(this.time*1.4)*.025+Math.sin(this.time*95)*this.hitFlash*.13);this.camera.rotation.z=this.reduced?0:-this.renderLean*.035;this.camera.rotation.y=-this.renderLean*.025;
-    if(this.hero)this.hands.visible=this.hero.update({beam,disc,discPreparation:this.discGesture,zepPreparation:this.zepellionStage,palm,punch,guard,dt});
-    if(this.hero){this.discPreview.visible=!!this.discGesture&&!beam&&!disc&&!palm&&!punch&&!guard;if(this.discPreview.visible){this.discPreview.position.copy(this.hero.socketWorld('disc'));this.discPreview.scale.setScalar((.25+.75*this.discGesture.progress)*this.hero.lens.scale);this.discPreview.rotation.z=this.time*10;}}
+    this.playerCamera.position.x=this.renderLean*4.5;this.playerCamera.position.y=9+(this.reduced?0:Math.sin(this.time*1.4)*.025+Math.sin(this.time*95)*this.hitFlash*.13);this.playerCamera.rotation.z=this.reduced?0:-this.renderLean*.035;this.playerCamera.rotation.y=-this.renderLean*.025;this.playerCamera.updateMatrixWorld(true);
+    if(this.viewMode==='third'){
+      const offset=this.camera.aspect<.8?4.5:6.6;
+      this.camera.position.set(this.renderLean*3+offset,13.2,this.camera.aspect<.8?43:41);this.camera.lookAt(this.renderLean*1.5+.5,8,0);
+    }else{this.camera.position.copy(this.playerCamera.position);this.camera.quaternion.copy(this.playerCamera.quaternion);}
+    this.camera.updateMatrixWorld(true);
+    if(this.hero){const showing=this.hero.update({beam,disc,discPreparation:this.discGesture,zepPreparation:this.zepellionStage,palm,punch,guard,dt});this.hands.visible=showing&&this.viewMode==='first';}
+    if(this.thirdHero){this.thirdHero.root.visible=this.viewMode==='third'&&this.playing&&!this.finished&&!this.loading;if(this.thirdHero.root.visible)this.thirdHero.update(this.hero,{lean:this.renderLean,time:this.time,punch,contactTarget:this.getHitPoint(),inMelee:this.inMelee});}
+    this.shield.scale.setScalar(this.viewMode==='third'?2:1);this.shieldGlow.scale.setScalar(this.viewMode==='third'?2:1);
+    if(this.hero){this.discPreview.visible=!!this.discGesture&&!beam&&!disc&&!palm&&!punch&&!guard;if(this.discPreview.visible){this.discPreview.position.copy(this.playerSocket('disc'));this.discPreview.scale.setScalar((.25+.75*this.discGesture.progress)*(this.viewMode==='third'?2.4:this.hero.lens.scale));this.discPreview.rotation.z=this.time*10;}}
     this.shield.material.uniforms.energy.value=this.guardAmount*.7+this.defenseFlash+this.shieldIgnition*.5;this.shield.material.uniforms.time.value=this.reduced?0:this.time;this.shieldGlow.material.opacity=this.guardAmount*.28+this.defenseFlash*.35+this.shieldIgnition*.65;this.shieldGlow.rotation.z=this.time*.1;
     this.hurt=Math.max(0,this.hurt-dt);this.defenseFlash=Math.max(0,this.defenseFlash-dt);this.hitFlash=Math.max(0,this.hitFlash-dt);this.impactVeil.material.opacity=this.hurt*.13;
   }
   animateEffects(dt){for(const e of this.visualEffects){e.age+=dt;const t=clamp(e.age/e.duration,0,1);if(e.kind==='disc'){
         const timing=e.timing||discTiming(e);
-        if(e.age<timing.release){e.start.copy(this.hero.socketWorld('disc'));e.disc.position.copy(e.start);e.disc.scale.setScalar(e.discSize*(.15+.85*clamp(e.age/Math.max(.001,timing.ready),0,1)));}
-        else{if(!e.released){e.start.copy(this.hero.socketWorld('disc'));e.released=true;}const flight=clamp((e.age-timing.release)/(timing.impact-timing.release),0,1);e.end.copy(this.getHitPoint());e.disc.position.lerpVectors(e.start,e.end,flight);e.disc.position.y+=Math.sin(flight*Math.PI)*.65;e.disc.scale.setScalar(e.discSize+flight*(3.6-e.discSize));}
+        if(e.age<timing.release){e.start.copy(this.playerSocket('disc'));e.disc.position.copy(e.start);e.disc.scale.setScalar(e.discSize*(.15+.85*clamp(e.age/Math.max(.001,timing.ready),0,1)));}
+        else{if(!e.released){e.start.copy(this.playerSocket('disc'));e.released=true;}const flight=clamp((e.age-timing.release)/(timing.impact-timing.release),0,1);e.end.copy(this.getHitPoint());e.disc.position.lerpVectors(e.start,e.end,flight);e.disc.position.y+=Math.sin(flight*Math.PI)*.65;e.disc.scale.setScalar(e.discSize+flight*(3.6-e.discSize));}
         e.disc.rotation.z=e.age*16;e.disc.rotation.x=.18;
         const fade=e.age<timing.impact?1:clamp(1-(e.age-timing.impact)/.35,0,1);e.disc.visible=fade>0;
         for(const [i,trail]of e.trail.entries()){const progress=clamp((e.age-timing.release-i*.035)/(timing.impact-timing.release),0,1);trail.position.lerpVectors(e.start,e.end,progress);trail.position.y+=Math.sin(progress*Math.PI)*.65;trail.material.opacity=e.age<timing.release?0:(.22-i*.025)*fade;}
       }
       if(e.kind==='palm'){
-        if(!e.released){e.start.copy(this.hero.socketWorld('palm'));if(e.age>=.18)e.released=true;}
+        if(!e.released){e.start.copy(this.playerSocket('palm'));if(e.age>=.18)e.released=true;}
         e.end.copy(this.getHitPoint());const flight=clamp((e.age-.18)/.16,0,1),point=e.start.clone().lerp(e.end,flight);
         e.orb.position.copy(point);e.core.position.copy(point);e.orb.material.opacity=e.age>.34?Math.max(0,1-(e.age-.34)/.2):1;e.core.material.opacity=e.orb.material.opacity;
       }
     if(e.kind==='beam'||e.kind==='zepellion'){
-        e.start.copy(this.hero.socketWorld('beam'));e.end.copy(this.getHitPoint());
+        e.start.copy(this.playerSocket('beam'));e.end.copy(this.getHitPoint());
         const bt=e.timing||BEAM_TIMING;const firing=e.age>=bt.fire,reveal=clamp((e.age-bt.fire)/(bt.impact-bt.fire),0,1),fade=clamp((e.duration-e.age)/(e.duration-bt.fade),0,1);
-        const [bottom,top]=this.hero.beamRail();e.volume.update(bottom,top,e.end,reveal,e.age,fade,this.reduced);
+        const [bottom,top]=this.viewMode==='third'&&this.thirdHero?this.thirdHero.beamRail():this.hero.beamRail();e.volume.update(bottom,top,e.end,reveal,e.age,fade,this.reduced);
         const charge=clamp((e.age-.07)/(bt.fire-.07),0,1);
         e.launch.position.copy(e.start);e.launch.material.opacity=(firing?.45:charge*.25)*fade;e.launch.scale.setScalar(firing?.65:.18+charge*.4);
         e.sourceCore.position.copy(e.start);e.sourceCore.material.opacity=(firing?.9:charge*.55)*fade;
@@ -488,7 +510,7 @@ export class BattleScene extends BattleEngine {
   }
   advance(dt){if(this.loading)return;for(let remaining=dt;remaining>1e-8;){const step=Math.min(remaining,1/60);this.update(step);remaining-=step;}this.animateMonster(dt);this.animateHands(dt);this.animateEffects(dt);if(this.celebration)this.animateCelebration(dt);}
   frame(now){const dt=Math.min(Math.max(0,(now-this.lastNow)/1000),.25);this.lastNow=now;if(!this.paused&&(!this.finished||this.celebrating>0)){this.advance(dt);}this.renderer.render(this.renderScene,this.camera);this.frameCount++;}
-  dispose(){this.disposed=true;this.selection=(this.selection||0)+1;this.renderer.setAnimationLoop(null);this.observer.disconnect();this.clearTransient();this.flareTexture?.dispose();this.renderer.dispose();}
+  dispose(){this.disposed=true;this.selection=(this.selection||0)+1;this.renderer.setAnimationLoop(null);this.observer.disconnect();this.clearTransient();if(this.thirdHero)this.disposeObject(this.thirdHero.root);this.flareTexture?.dispose();this.renderer.dispose();}
 }
 
 

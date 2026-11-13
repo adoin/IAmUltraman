@@ -215,6 +215,7 @@ export class HeroAnimation {
     this.neutral=[-1,1].map(sign=>state(v(sign*.74,-.64,-.20),v(sign*.62,.65,-.43),v(0,0,1),'rest'));
     this.shield=[-1,1].map(sign=>state(v(-sign*.4,-.6,-1),v(-sign*.9,.9,-.10),v(0,0,1),'fist'));
     this.boxing=[-1,1].map(sign=>state(v(sign*.62,-.35,-.70),v(-sign*.60,.92,-.35),v(0,0,1),'fist'));
+    if(this.thirdPerson)this.neutral=this.boxing.map(copyPose);
     this.beamUp=null;
     this.syncBeamPose();
     this.discHeld=this.discPose(false);

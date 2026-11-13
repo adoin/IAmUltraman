@@ -4,6 +4,8 @@
 
 ## 文件
 
+第三人称角色：`art/import_tiga_body.py` 从同一 Extrazhang 源文件导出完整身体、眼睛与计时器，重建 52 根 FK 骨骼，复用校色后的 PBR 纹理并缩至 1024 像素。运行 `D:/software/Blender/blender.exe --background --threads 1 --factory-startup --disable-autoexec --python-exit-code 1 --python art/import_tiga_body.py`，产物为 `public/models/kaiju/hero-body.glb`。其 CC-BY-NC 来源说明与第一人称模型一致。
+
 | 源文件 | 网页模型 | 用途 |
 | --- | --- | --- |
 | models/basalt.blend | ../public/models/kaiju/basalt.glb | 岩甲兽，岩甲与近战技能 |

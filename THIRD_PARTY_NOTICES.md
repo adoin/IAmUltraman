@@ -10,6 +10,8 @@ The game uses a first-person derivative of the continuous arm mesh. Each arm ret
 
 The on-screen **制作与鸣谢** presents this attribution and modification notice. This is community fan art, with no official affiliation asserted.
 
+The optional third-person character also derives from the same Extrazhang source and retains the same CC-BY-NC declaration. `art/import_tiga_body.py` exports its complete continuous mesh, eyes and color timer with a clean 52-bone FK skeleton and 1024-pixel PBR textures as `public/models/kaiju/hero-body.glb`. `src/third-person-hero.js` retargets the game's existing arm/finger poses and supplies character-based effect origins. This asset is loaded when selecting the third-person viewpoint; it is separate from the victory take-off model below.
+
 ## Full-body motion preview
 
 The independent punch preview uses **Punch_Cross** by **Quaternius**, from [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html), licensed under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The motion is retargeted to the Extrazhang Tiga derivative above. Adaptations include wrist and foot placement for the different body proportions, a first-person head mask and a camera at the source eye midpoint. The combined character asset is distributed for this noncommercial game. Both source credits appear on the preview page.
