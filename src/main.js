@@ -54,7 +54,7 @@ const skillHUD=new SkillHUD(document.querySelector('.battle-hud'),skill=>{if(ski
 function leaveBattleView(){document.body.classList.remove('in-battle');if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});scene.resize?.();}
 function log(text){state.debug.unshift(`${new Date().toLocaleTimeString()} ${text}`);state.debug=state.debug.slice(0,6);}
 async function start(){await audio.unlock();if(state.started)return;if(state.starting)return;state.starting=true;try{await scene.ready;if(state.viewChange)await state.viewChange.catch(()=>{});if(pose.promise)await pose.promise.catch(()=>{});if(state.mode==='camera')await waitForInputFrame(state.epoch);state.started=true;enterBattleView();audio.setActive(true);recognizer.reset();scene.start();$('welcome').hidden=true;$('pause').hidden=false;$('scene-status').textContent='十字发光线 · 胸前交叉开护盾 · 侧身躲攻击';say('相信自己，相信光！');syncPause();}catch{$('load-status').textContent='游戏尚未准备好，请检查影像或刷新重试';}finally{state.starting=false;}}
-function syncPause(){scene.paused=state.manualPause||!!document.querySelector('dialog[open]')||document.hidden;audio.setActive(state.started&&!scene.loading&&!scene.paused&&(!scene.finished||scene.celebrating>0));}
+function syncPause(){scene.paused=state.manualPause||!!state.viewChange||!!document.querySelector('dialog[open]')||document.hidden;audio.setActive(state.started&&!scene.loading&&!scene.paused&&(!scene.finished||scene.celebrating>0));}
 function manualPause(value){if(!state.started||scene.finished)return;clearDefense();state.manualPause=value;if(value)leaveBattleView();else enterBattleView();$('pause-panel').hidden=!value;$('resume').hidden=false;$('pause-panel').querySelector('h2').textContent='小英雄休息中';$('pause-panel').querySelector('p').textContent='准备好了，就继续守护城市。';$('pause-panel').querySelector('.little-tag').textContent='补充一点光的力量';$('pause').textContent=value?'▶':'Ⅱ';$('pause').setAttribute('aria-label',value?'继续游戏':'暂停游戏');recognizer.reset();syncPause();}
 async function cast(skill,side='right'){audio.unlock();if(!state.started)await start();scene.cast(skill,side);}
 $('start-keyboard').onclick=()=>{if(video||state.pending||state.mode!=='keyboard')stopInput();return start();};
@@ -64,6 +64,7 @@ $('game').addEventListener('click',()=>{if(document.body.classList.contains('in-
 $('game').addEventListener('touchstart',e=>{if(e.touches.length>1&&document.body.classList.contains('in-battle')){e.preventDefault();manualPause(true);}},{passive:false});
 $('beam-button').onclick=()=>cast('beam');$('zepellion-button').onclick=()=>cast('zepellion');$('disc-button').onclick=()=>cast('disc');$('palm-button').onclick=()=>cast('palm');
 $('pause').onclick=()=>manualPause(!state.manualPause);$('resume').onclick=async()=>{if(state.viewChange)await state.viewChange.catch(()=>{});if(pose.promise)await pose.promise.catch(()=>{});manualPause(false);};
+$('pause-settings').onclick=()=>$('settings').click();
 $('retry-wave').onclick=()=>scene.selectMonster?.();
 $('restart').onclick=async()=>{if(pose.promise)await pose.promise.catch(()=>{});clearDefense();$('threat').hidden=true;$('celebration').hidden=true;document.body.classList.remove('celebrating');enterBattleView();audio.setActive(true);scene.start();state.manualPause=false;$('pause-panel').hidden=true;recognizer.reset();syncPause();say('新的冒险，出发！');};
 const heldKeys=new Set(['a','d','l','arrowleft','arrowright']);
@@ -118,7 +119,16 @@ for(const [id,direction]of [['dodge-left',-1],['dodge-right',1]])$(id).onclick=(
 document.querySelectorAll('[data-battle]').forEach(button=>button.onclick=()=>{const action=button.dataset.battle;if(action==='help')$('show-moves').click();else if(action==='guard')$('guard-button').click();else if(action==='left'||action==='right')$('dodge-'+action).click();else cast(action);});
 $('difficulty').onchange=e=>scene.difficulty=e.target.value;
 $('quality').onchange=e=>scene.setQuality?.(e.target.value);
-$('view-mode').onchange=async e=>{const select=e.target,status=$('view-mode-state');select.disabled=true;status.hidden=false;status.textContent='正在准备视角…';try{state.viewChange=scene.setViewMode(select.value);await state.viewChange;$("game").setAttribute("aria-label",select.value==="third"?"从奥特曼身后看向怪兽的第三人称战斗画面":"从英雄双眼看向怪兽的第一人称战斗画面");status.textContent='';status.hidden=true;}catch{select.value=scene.viewMode||'first';status.textContent='角色暂时无法加载，请重试切换';}finally{state.viewChange=null;select.disabled=false;}};
+async function changeViewpoint(mode){
+  if(state.viewChange)return;
+  const selects=[$('view-mode'),$('quick-view-mode')],statuses=[$('view-mode-state'),$('quick-view-status')];
+  for(const select of selects){select.value=mode;select.disabled=true;}
+  for(const status of statuses){status.hidden=false;status.textContent='正在准备视角…';}
+  try{state.viewChange=scene.setViewMode(mode);syncPause();await state.viewChange;$('game').setAttribute('aria-label',mode==='third'?'从奥特曼身后看向怪兽的第三人称战斗画面':'从英雄双眼看向怪兽的第一人称战斗画面');for(const status of statuses){status.textContent='';status.hidden=true;}}
+  catch{for(const select of selects)select.value=scene.viewMode||'first';for(const status of statuses)status.textContent='角色暂时无法加载，请重试切换';}
+  finally{state.viewChange=null;for(const select of selects)select.disabled=false;syncPause();}
+}
+$('view-mode').onchange=$('quick-view-mode').onchange=e=>changeViewpoint(e.target.value);
 $('recenter').onclick=()=>{recognizer.reset();state.gestureLean=0;state.gestureGuard=false;log('已校准侧身中心');};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.querySelector('.arena').requestFullscreen();}catch{say('浏览器不支持全屏，可横屏游玩');}};
 for(const [id,button] of [['help-dialog','help'],['settings-dialog','settings'],['credits-dialog','credits']]){const dialog=$(id);$(button).onclick=()=>{dialog.showModal();clearDefense();syncPause();};dialog.addEventListener('close',()=>{recognizer.reset();clearDefense();syncPause();});dialog.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>dialog.close());dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});}
